@@ -151,24 +151,24 @@ export const getPersonMovieCredits = async (personId: number): Promise<PersonCre
 
 // ジャンルIDの定義
 export const GENRES = {
-    action: { id: 28, name: 'アクション', emoji: '💥' },
-    adventure: { id: 12, name: 'アドベンチャー', emoji: '🗺️' },
-    animation: { id: 16, name: 'アニメ', emoji: '🎨' },
-    comedy: { id: 35, name: 'コメディ', emoji: '😂' },
-    crime: { id: 80, name: '犯罪', emoji: '🔪' },
-    documentary: { id: 99, name: 'ドキュメンタリー', emoji: '📹' },
-    drama: { id: 18, name: 'ドラマ', emoji: '🎭' },
-    family: { id: 10751, name: 'ファミリー', emoji: '👨‍👩‍👧' },
-    fantasy: { id: 14, name: 'ファンタジー', emoji: '🧙' },
-    history: { id: 36, name: '歴史', emoji: '📜' },
-    horror: { id: 27, name: 'ホラー', emoji: '👻' },
-    music: { id: 10402, name: '音楽', emoji: '🎵' },
-    mystery: { id: 9648, name: 'ミステリー', emoji: '🔍' },
-    romance: { id: 10749, name: 'ロマンス', emoji: '💕' },
-    scifi: { id: 878, name: 'SF', emoji: '🚀' },
-    thriller: { id: 53, name: 'スリラー', emoji: '😱' },
-    war: { id: 10752, name: '戦争', emoji: '⚔️' },
-    western: { id: 37, name: '西部劇', emoji: '🤠' },
+    action: { id: 28, name: 'アクション' },
+    adventure: { id: 12, name: 'アドベンチャー' },
+    animation: { id: 16, name: 'アニメ' },
+    comedy: { id: 35, name: 'コメディ' },
+    crime: { id: 80, name: '犯罪' },
+    documentary: { id: 99, name: 'ドキュメンタリー' },
+    drama: { id: 18, name: 'ドラマ' },
+    family: { id: 10751, name: 'ファミリー' },
+    fantasy: { id: 14, name: 'ファンタジー' },
+    history: { id: 36, name: '歴史' },
+    horror: { id: 27, name: 'ホラー' },
+    music: { id: 10402, name: '音楽' },
+    mystery: { id: 9648, name: 'ミステリー' },
+    romance: { id: 10749, name: 'ロマンス' },
+    scifi: { id: 878, name: 'SF' },
+    thriller: { id: 53, name: 'スリラー' },
+    war: { id: 10752, name: '戦争' },
+    western: { id: 37, name: '西部劇' },
 };
 
 // ジャンル別映画を取得
@@ -197,3 +197,302 @@ export const getUpcomingMovies = async (page = 1): Promise<{ results: Movie[]; t
     );
     return response.json();
 };
+
+// Watch Provider型
+export interface WatchProvider {
+    provider_id: number;
+    provider_name: string;
+    logo_path: string;
+    display_priority: number;
+}
+
+export interface WatchProviderResult {
+    link?: string;  // JustWatchへのリンク
+    flatrate?: WatchProvider[];  // 定額見放題
+    rent?: WatchProvider[];      // レンタル
+    buy?: WatchProvider[];       // 購入
+}
+
+export interface WatchProvidersResponse {
+    id: number;
+    results: {
+        JP?: WatchProviderResult;
+        [key: string]: WatchProviderResult | undefined;
+    };
+}
+
+// 映画の視聴可能な配信サービスを取得（日本）
+export const getWatchProviders = async (movieId: number): Promise<WatchProviderResult | null> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/movie/${movieId}/watch/providers`,
+            fetchOptions
+        );
+        const data: WatchProvidersResponse = await response.json();
+
+        // 日本のデータを返す
+        return data.results?.JP || null;
+    } catch (error) {
+        console.error('Watch providers fetch error:', error);
+        return null;
+    }
+};
+
+// アフィリエイトタグ（環境変数から取得、未設定時は空）
+const AMAZON_AFFILIATE_TAG = process.env.EXPO_PUBLIC_AMAZON_AFFILIATE_TAG || '';
+
+// 配信サービスのURL設定（provider_idベース）
+interface ProviderUrlConfig {
+    getUrl: (title: string) => string;
+}
+
+const PROVIDER_URL_CONFIG: { [providerId: number]: ProviderUrlConfig } = {
+    // Netflix (provider_id: 8)
+    8: {
+        getUrl: (title) => `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
+    },
+    // Amazon Video (provider_id: 10) - アフィリエイト対応
+    10: {
+        getUrl: (title) => {
+            const baseUrl = `https://www.amazon.co.jp/gp/video/search?phrase=${encodeURIComponent(title)}`;
+            return AMAZON_AFFILIATE_TAG ? `${baseUrl}&tag=${AMAZON_AFFILIATE_TAG}` : baseUrl;
+        },
+    },
+    // Apple TV (provider_id: 2)
+    2: {
+        getUrl: (title) => `https://tv.apple.com/jp/search?term=${encodeURIComponent(title)}`,
+    },
+    // Google Play Movies (provider_id: 3)
+    3: {
+        getUrl: (title) => `https://play.google.com/store/search?q=${encodeURIComponent(title)}&c=movies`,
+    },
+    // U-NEXT (provider_id: 84)
+    84: {
+        getUrl: (title) => `https://video.unext.jp/freeword?query=${encodeURIComponent(title)}`,
+    },
+    // Disney Plus (provider_id: 337)
+    337: {
+        getUrl: (title) => `https://www.disneyplus.com/ja-jp/search?q=${encodeURIComponent(title)}`,
+    },
+    // Hulu Japan (provider_id: 15)
+    15: {
+        getUrl: (title) => `https://www.hulu.jp/search?q=${encodeURIComponent(title)}`,
+    },
+    // ABEMA (provider_id: 533)
+    533: {
+        getUrl: (title) => `https://abema.tv/search?q=${encodeURIComponent(title)}`,
+    },
+    // Rakuten TV (provider_id: 344)
+    344: {
+        getUrl: (title) => `https://tv.rakuten.co.jp/search/?sr=${encodeURIComponent(title)}`,
+    },
+    // YouTube (provider_id: 192)
+    192: {
+        getUrl: (title) => `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}+映画`,
+    },
+    // dTV / Lemino (provider_id: 85)
+    85: {
+        getUrl: (title) => `https://lemino.docomo.ne.jp/search/keyword?query=${encodeURIComponent(title)}`,
+    },
+    // WOWOW (provider_id: 515)
+    515: {
+        getUrl: (title) => `https://www.wowow.co.jp/search/?keyword=${encodeURIComponent(title)}`,
+    },
+    // Amazon Prime Video (provider_id: 9) - アフィリエイト対応
+    9: {
+        getUrl: (title) => {
+            const baseUrl = `https://www.amazon.co.jp/gp/video/search?phrase=${encodeURIComponent(title)}`;
+            return AMAZON_AFFILIATE_TAG ? `${baseUrl}&tag=${AMAZON_AFFILIATE_TAG}` : baseUrl;
+        },
+    },
+    // FOD (provider_id: 688)
+    688: {
+        getUrl: (title) => `https://fod.fujitv.co.jp/search/?q=${encodeURIComponent(title)}`,
+    },
+    // Paravi / U-NEXT (provider_id: 97) - Paraviは現在U-NEXTに統合
+    97: {
+        getUrl: (title) => `https://video.unext.jp/freeword?query=${encodeURIComponent(title)}`,
+    },
+    // TELASA (provider_id: 429)
+    429: {
+        getUrl: (title) => `https://www.telasa.jp/search?query=${encodeURIComponent(title)}`,
+    },
+};
+
+/**
+ * 配信サービスのURLを取得
+ * @param providerId TMDbのprovider_id
+ * @param movieTitle 映画タイトル
+ * @param fallbackLink TMDbから取得したlinkフィールド（JustWatch経由）
+ * @returns 配信サービスの検索URL
+ */
+export const getProviderUrl = (
+    providerId: number,
+    movieTitle: string,
+    fallbackLink?: string
+): string => {
+    const config = PROVIDER_URL_CONFIG[providerId];
+
+    if (config) {
+        return config.getUrl(movieTitle);
+    }
+
+    // 未知のprovider_idはTMDbのlink（JustWatch経由）を使用
+    if (fallbackLink) {
+        return fallbackLink;
+    }
+
+    // 最終フォールバック: 映画タイトルでGoogle検索
+    return `https://www.google.com/search?q=${encodeURIComponent(movieTitle)}+視聴`;
+};
+
+// 後方互換性のため旧関数名もエクスポート（非推奨）
+/** @deprecated getProviderUrl を使用してください */
+export const getProviderSearchUrl = (providerName: string, movieTitle: string): string => {
+    // 名前からprovider_idを推測（後方互換性のみ）
+    const nameToId: { [key: string]: number } = {
+        'netflix': 8,
+        'amazon': 10,
+        'apple': 2,
+        'google': 3,
+        'u-next': 84,
+        'unext': 84,
+        'disney': 337,
+        'hulu': 15,
+        'abema': 533,
+    };
+
+    const lowerName = providerName.toLowerCase();
+    const providerId = Object.entries(nameToId).find(([key]) => lowerName.includes(key))?.[1];
+
+    return getProviderUrl(providerId || 0, movieTitle);
+};
+
+// ====== ホーム画面新機能用 ======
+
+// 気分別映画を取得
+export const getMoviesByMood = async (
+    genreIds: number[],
+    excludeGenreIds: number[] = [],
+    minRating: number = 6.5,
+    seed: number = 0
+): Promise<Movie | null> => {
+    try {
+        // ジャンルIDを|（OR）で結合して、いずれかのジャンルに該当する映画を取得
+        const genreParam = genreIds.join('|');
+        const excludeParam = excludeGenreIds.length > 0 ? `&without_genres=${excludeGenreIds.join(',')}` : '';
+
+        const response = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&region=JP&with_genres=${genreParam}${excludeParam}&vote_average.gte=${minRating}&vote_count.gte=100&sort_by=popularity.desc&page=${(seed % 3) + 1}`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        if (data.results && data.results.length > 0) {
+            // シードを使って日替わりで異なる映画を選択
+            const index = seed % data.results.length;
+            return data.results[index];
+        }
+        return null;
+    } catch (error) {
+        console.error('Mood movies fetch error:', error);
+        return null;
+    }
+};
+
+// 人物の代表作を取得
+export const getPersonCredits = async (personId: number): Promise<Movie[]> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/person/${personId}/movie_credits?language=ja-JP`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        // 出演作と監督作を統合
+        const cast = data.cast || [];
+        const crew = (data.crew || []).filter((m: any) => m.job === 'Director');
+        const combined = [...cast, ...crew];
+
+        // 重複を除去
+        const uniqueMovies = Array.from(
+            new Map(combined.map((m: Movie) => [m.id, m])).values()
+        ) as Movie[];
+
+        // vote_count（投票数=知名度）順でソートして代表作を優先表示
+        return uniqueMovies
+            .filter((m: Movie) => m.poster_path)
+            .sort((a: Movie, b: Movie) => (b.vote_count || 0) - (a.vote_count || 0))
+            .slice(0, 5);
+    } catch (error) {
+        console.error('Person credits fetch error:', error);
+        return [];
+    }
+};
+
+// アニバーサリー映画を取得（今日と同じ月日に公開された名作）
+export const getAnniversaryMovies = async (): Promise<{ movie: Movie; years: number }[]> => {
+    try {
+        const today = new Date();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+
+        const anniversaryMovies: { movie: Movie; years: number }[] = [];
+
+        // 複数ページから検索して今日と同じ月日の映画を見つける
+        for (let page = 1; page <= 10 && anniversaryMovies.length < 3; page++) {
+            const response = await fetch(
+                `${baseUrl}/discover/movie?language=ja-JP&sort_by=vote_count.desc&vote_average.gte=7.0&vote_count.gte=500&primary_release_date.lte=${today.getFullYear()}-12-31&page=${page}`,
+                fetchOptions
+            );
+            const data = await response.json();
+
+            for (const movie of data.results || []) {
+                if (movie.release_date) {
+                    const releaseDate = movie.release_date.split('-'); // YYYY-MM-DD
+                    if (releaseDate[1] === month && releaseDate[2] === day) {
+                        const years = today.getFullYear() - parseInt(releaseDate[0]);
+                        if (years >= 5) { // 5年以上前の作品のみ
+                            anniversaryMovies.push({ movie, years });
+                            if (anniversaryMovies.length >= 3) break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return anniversaryMovies;
+    } catch (error) {
+        console.error('Anniversary movies fetch error:', error);
+        return [];
+    }
+};
+
+// 映画のトリビア情報を取得（制作費・興行収入など）
+export const getMovieTrivia = async (movieId: number): Promise<{
+    budget: number;
+    revenue: number;
+    productionCountries: string[];
+    productionCompanies: string[];
+    tagline: string;
+} | null> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/movie/${movieId}?language=ja-JP`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        return {
+            budget: data.budget || 0,
+            revenue: data.revenue || 0,
+            productionCountries: (data.production_countries || []).map((c: any) => c.name),
+            productionCompanies: (data.production_companies || []).map((c: any) => c.name),
+            tagline: data.tagline || '',
+        };
+    } catch (error) {
+        console.error('Movie trivia fetch error:', error);
+        return null;
+    }
+};
+

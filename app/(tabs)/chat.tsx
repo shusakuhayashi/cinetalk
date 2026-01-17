@@ -10,15 +10,19 @@ import {
     ActivityIndicator,
     Modal,
     Image,
+    Alert,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import { useChatStore } from '../../stores/chatStore';
 import { useReviewStore } from '../../stores/reviewStore';
 import { useCalendarStore } from '../../stores/calendarStore';
 import { chatModel, summarizeModel } from '../../services/gemini';
 import { getImageUrl } from '../../services/tmdb';
+import { voiceRecognition } from '../../services/voiceRecognition';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
 
 type ReviewMode = 'chat' | 'direct';
 
@@ -51,6 +55,7 @@ const EMOTION_TAGS = [
 ];
 
 export default function ChatScreen() {
+    const insets = useSafeAreaInsets();
     const [mode, setMode] = useState<ReviewMode>('chat');
     const [message, setMessage] = useState('');
     const [directReview, setDirectReview] = useState('');
@@ -58,6 +63,7 @@ export default function ChatScreen() {
     const [selectedRating, setSelectedRating] = useState(4);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [generatedReview, setGeneratedReview] = useState('');
+    const [isRecording, setIsRecording] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
 
     const { messages, isLoading, selectedMovie, addMessage, setLoading, clearChat } = useChatStore();
@@ -75,6 +81,84 @@ export default function ChatScreen() {
                 ? prev.filter((id) => id !== tagId)
                 : [...prev, tagId]
         );
+    };
+
+    // 音声入力用のベーステキスト（useRefでクロージャ問題を回避）
+    const baseMessageRef = useRef('');
+    const baseDirectReviewRef = useRef('');
+
+    // 音声入力の開始/停止
+    const toggleVoiceInput = () => {
+        if (!voiceRecognition.isSupported()) {
+            Alert.alert(
+                '音声入力非対応',
+                'このブラウザ/デバイスでは音声入力がサポートされていません\nChromeブラウザをお試しください'
+            );
+            return;
+        }
+
+        if (isRecording) {
+            voiceRecognition.stop();
+            setIsRecording(false);
+        } else {
+            // 録音開始時のテキストを保存
+            baseMessageRef.current = message;
+            voiceRecognition.start({
+                onResult: (text, isFinal) => {
+                    const newText = baseMessageRef.current + text;
+                    setMessage(newText);
+
+                    if (isFinal) {
+                        // 最終結果：ベーステキストを更新して次の発話に備える
+                        baseMessageRef.current = newText;
+                    }
+                },
+                onError: (error) => {
+                    Alert.alert('音声入力エラー', error);
+                    setIsRecording(false);
+                },
+                onStatusChange: (listening) => {
+                    setIsRecording(listening);
+                },
+            });
+        }
+    };
+
+    // 直接入力モードの音声入力
+    const toggleDirectVoiceInput = () => {
+        if (!voiceRecognition.isSupported()) {
+            Alert.alert(
+                '音声入力非対応',
+                'このブラウザ/デバイスでは音声入力がサポートされていません\nChromeブラウザをお試しください'
+            );
+            return;
+        }
+
+        if (isRecording) {
+            voiceRecognition.stop();
+            setIsRecording(false);
+        } else {
+            // 録音開始時のテキストを保存
+            baseDirectReviewRef.current = directReview;
+            voiceRecognition.start({
+                onResult: (text, isFinal) => {
+                    const newText = baseDirectReviewRef.current + text;
+                    setDirectReview(newText);
+
+                    if (isFinal) {
+                        // 最終結果：ベーステキストを更新して次の発話に備える
+                        baseDirectReviewRef.current = newText;
+                    }
+                },
+                onError: (error) => {
+                    Alert.alert('音声入力エラー', error);
+                    setIsRecording(false);
+                },
+                onStatusChange: (listening) => {
+                    setIsRecording(listening);
+                },
+            });
+        }
     };
 
     // 選択された映画のコンテキストを構築
@@ -230,16 +314,14 @@ export default function ChatScreen() {
     );
 
     return (
-        <>
-            <Stack.Screen
-                options={{
-                    headerRight: () => selectedMovie ? <HeaderRight /> : null,
-                }}
-            />
+        <View style={styles.container}>
+            {/* 統一ヘッダー */}
+            <StaticHeader title="REVIEW" />
+
             <KeyboardAvoidingView
-                style={styles.container}
+                style={[styles.keyboardView, { paddingTop: HEADER_HEIGHT + insets.top }]}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={90}
+                keyboardVerticalOffset={0}
             >
                 {/* 選択中の映画バナー */}
                 {selectedMovie && (
@@ -293,6 +375,16 @@ export default function ChatScreen() {
                             </View>
 
                             <TagSelector />
+
+                            {/* 音声入力ボタン */}
+                            <TouchableOpacity
+                                style={[styles.voiceInputBtn, isRecording && styles.voiceInputBtnRecording]}
+                                onPress={toggleDirectVoiceInput}
+                            >
+                                <Text style={styles.voiceInputBtnText}>
+                                    {isRecording ? 'REC' : 'MIC'}
+                                </Text>
+                            </TouchableOpacity>
 
                             <TextInput
                                 style={styles.directTextInput}
@@ -369,6 +461,13 @@ export default function ChatScreen() {
                 {/* 入力欄（チャットモードの場合のみ表示） */}
                 {selectedMovie && mode === 'chat' && (
                     <View style={styles.inputContainer}>
+                        {/* マイクボタン */}
+                        <TouchableOpacity
+                            style={[styles.micBtn, isRecording && styles.micBtnRecording]}
+                            onPress={toggleVoiceInput}
+                        >
+                            <Text style={styles.micBtnText}>{isRecording ? 'REC' : 'MIC'}</Text>
+                        </TouchableOpacity>
                         <TextInput
                             style={styles.input}
                             placeholder="感想を話してください..."
@@ -435,8 +534,43 @@ export default function ChatScreen() {
                         </ScrollView>
                     </View>
                 </Modal>
+
+                {/* 録音中フローティングオーバーレイ */}
+                {isRecording && (
+                    <View style={styles.recordingOverlay}>
+                        {/* 背景ぼかし */}
+                        <View style={styles.recordingBackdrop} />
+
+                        {/* フローティングカード */}
+                        <View style={styles.recordingCard}>
+                            {/* ミニマルなインジケーター */}
+                            <View style={styles.recordingIndicator}>
+                                <View style={styles.recordingDot} />
+                                <Text style={styles.recordingLabel}>REC</Text>
+                            </View>
+
+                            {/* 入力テキスト表示 */}
+                            <ScrollView
+                                style={styles.recordingTextScroll}
+                                contentContainerStyle={styles.recordingTextContent}
+                            >
+                                <Text style={styles.recordingText}>
+                                    {mode === 'chat' ? message : directReview || '...'}
+                                </Text>
+                            </ScrollView>
+
+                            {/* スタイリッシュな停止ボタン */}
+                            <TouchableOpacity
+                                style={styles.stopRecordingBtn}
+                                onPress={mode === 'chat' ? toggleVoiceInput : toggleDirectVoiceInput}
+                            >
+                                <View style={styles.stopIcon} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </KeyboardAvoidingView>
-        </>
+        </View>
     );
 }
 
@@ -444,6 +578,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,
+    },
+    keyboardView: {
+        flex: 1,
     },
     headerButton: {
         marginRight: 16,
@@ -814,5 +951,122 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         letterSpacing: 1,
         color: '#FFF',
+    },
+    // 音声入力ボタン（チャットモード）
+    micBtn: {
+        backgroundColor: Colors.light.surface,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+    },
+    micBtnRecording: {
+        backgroundColor: '#FF4444',
+        borderColor: '#FF4444',
+    },
+    micBtnText: {
+        fontSize: 16,
+    },
+    // 音声入力ボタン（直接入力モード）
+    voiceInputBtn: {
+        backgroundColor: Colors.light.surface,
+        paddingVertical: 14,
+        borderRadius: 4,
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+        borderStyle: 'dashed',
+    },
+    voiceInputBtnRecording: {
+        backgroundColor: '#FF4444',
+        borderColor: '#FF4444',
+        borderStyle: 'solid',
+    },
+    voiceInputBtnText: {
+        fontSize: 14,
+        color: Colors.light.textMuted,
+    },
+    // 録音中オーバーレイ
+    recordingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    recordingBackdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    },
+    recordingCard: {
+        backgroundColor: Colors.light.surface,
+        borderRadius: 16,
+        padding: 24,
+        width: '90%',
+        maxWidth: 400,
+        maxHeight: '70%',
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    recordingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF3B30',
+        marginRight: 8,
+    },
+    recordingLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#FF3B30',
+        letterSpacing: 2,
+    },
+    recordingTextScroll: {
+        maxHeight: 200,
+        marginBottom: 20,
+    },
+    recordingTextContent: {
+        paddingVertical: 4,
+    },
+    recordingText: {
+        fontSize: 17,
+        lineHeight: 28,
+        color: Colors.light.text,
+        textAlign: 'center',
+    },
+    stopRecordingBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.light.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+    },
+    stopIcon: {
+        width: 14,
+        height: 14,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 2,
     },
 });

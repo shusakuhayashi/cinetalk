@@ -1,8 +1,7 @@
-import { Tabs, router } from 'expo-router';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
-import { useAuthStore } from '../../stores/authStore';
 
 // ミニマルなアイコンコンポーネント
 const TabIcon = ({ label, focused }: { label: string; focused: boolean }) => (
@@ -18,85 +17,13 @@ const TabIcon = ({ label, focused }: { label: string; focused: boolean }) => (
     </View>
 );
 
-// ヘッダー右側のプロフィールアイコン
-const ProfileIcon = () => {
-    const { user, isAuthenticated } = useAuthStore();
-
-    return (
-        <TouchableOpacity
-            onPress={() => router.push('/profile')}
-            style={{
-                marginRight: 16,
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: isAuthenticated ? Colors.light.headerText : 'transparent',
-                borderWidth: isAuthenticated ? 0 : 1.5,
-                borderColor: Colors.light.headerText,
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-            }}
-        >
-            {isAuthenticated && user?.avatar_url ? (
-                <Image
-                    source={{ uri: user.avatar_url }}
-                    style={{ width: 28, height: 28, borderRadius: 14 }}
-                />
-            ) : isAuthenticated && user?.name ? (
-                <Text style={{
-                    fontSize: 12,
-                    color: Colors.light.headerBg,
-                    fontWeight: '600',
-                }}>
-                    {user.name.charAt(0).toUpperCase()}
-                </Text>
-            ) : (
-                // 未ログイン: 人マーク
-                <View style={{ alignItems: 'center' }}>
-                    <View style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: 'transparent',
-                        borderWidth: 1.5,
-                        borderColor: Colors.light.headerText,
-                        marginBottom: 2,
-                    }} />
-                    <View style={{
-                        width: 14,
-                        height: 6,
-                        borderTopLeftRadius: 7,
-                        borderTopRightRadius: 7,
-                        backgroundColor: 'transparent',
-                        borderWidth: 1.5,
-                        borderBottomWidth: 0,
-                        borderColor: Colors.light.headerText,
-                    }} />
-                </View>
-            )}
-        </TouchableOpacity>
-    );
-};
-
 export default function TabLayout() {
     const insets = useSafeAreaInsets();
 
     return (
         <Tabs
             screenOptions={{
-                headerStyle: {
-                    backgroundColor: Colors.light.headerBg,
-                    elevation: 0,
-                    shadowOpacity: 0,
-                },
-                headerTintColor: Colors.light.headerText,
-                headerTitleStyle: {
-                    fontWeight: '600',
-                    fontSize: 14,
-                    letterSpacing: 2,
-                },
-                headerRight: () => <ProfileIcon />,
+                headerShown: false,
 
                 tabBarStyle: {
                     backgroundColor: Colors.light.tabBg,
@@ -113,7 +40,6 @@ export default function TabLayout() {
                 name="index"
                 options={{
                     title: 'HOME',
-                    headerTitle: 'CINETALK',
                     tabBarIcon: ({ focused }) => <TabIcon label="HOME" focused={focused} />,
                 }}
             />
@@ -121,7 +47,6 @@ export default function TabLayout() {
                 name="calendar"
                 options={{
                     title: 'LOG',
-                    headerTitle: 'WATCH LOG',
                     tabBarIcon: ({ focused }) => <TabIcon label="LOG" focused={focused} />,
                 }}
             />
@@ -142,7 +67,6 @@ export default function TabLayout() {
                 name="chat"
                 options={{
                     href: null,
-                    headerTitle: 'REVIEW',
                 }}
             />
         </Tabs>

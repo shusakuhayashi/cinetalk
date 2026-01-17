@@ -1,13 +1,16 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useState, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import { useCalendarStore } from '../../stores/calendarStore';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
 
 const { width } = Dimensions.get('window');
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
 export default function CalendarScreen() {
+    const insets = useSafeAreaInsets();
     const [currentDate, setCurrentDate] = useState(new Date());
     const { records, selectedDate, setSelectedDate } = useCalendarStore();
 
@@ -67,116 +70,124 @@ export default function CalendarScreen() {
         currentYear === today.getFullYear();
 
     return (
-        <ScrollView style={styles.container}>
-            {/* 月選択ヘッダー */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={goToPrevMonth} style={styles.navButton}>
-                    <Text style={styles.navButtonText}>◀</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>
-                    {currentYear}年 {MONTHS[currentMonth]}
-                </Text>
-                <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
-                    <Text style={styles.navButtonText}>▶</Text>
-                </TouchableOpacity>
-            </View>
+        <View style={styles.container}>
+            {/* 固定ヘッダー */}
+            <StaticHeader title="WATCH LOG" />
 
-            {/* 曜日ヘッダー */}
-            <View style={styles.weekHeader}>
-                {DAYS.map((day, index) => (
-                    <View key={day} style={styles.weekDay}>
-                        <Text
-                            style={[
-                                styles.weekDayText,
-                                index === 0 && styles.sundayText,
-                                index === 6 && styles.saturdayText,
-                            ]}
-                        >
-                            {day}
-                        </Text>
-                    </View>
-                ))}
-            </View>
-
-            {/* カレンダーグリッド */}
-            <View style={styles.calendarGrid}>
-                {calendarDays.map((day, index) => (
-                    <TouchableOpacity
-                        key={index}
-                        style={[
-                            styles.dayCell,
-                            day && isToday(day) && styles.todayCell,
-                            day &&
-                            selectedDate ===
-                            `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` &&
-                            styles.selectedCell,
-                        ]}
-                        onPress={() => day && handleDayPress(day)}
-                        disabled={!day}
-                    >
-                        {day && (
-                            <>
-                                <Text
-                                    style={[
-                                        styles.dayText,
-                                        index % 7 === 0 && styles.sundayText,
-                                        index % 7 === 6 && styles.saturdayText,
-                                        isToday(day) && styles.todayText,
-                                    ]}
-                                >
-                                    {day}
-                                </Text>
-                                {hasRecord(day) && <View style={styles.recordDot} />}
-                            </>
-                        )}
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top }}
+            >
+                {/* 月選択ヘッダー */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={goToPrevMonth} style={styles.navButton}>
+                        <Text style={styles.navButtonText}>◀</Text>
                     </TouchableOpacity>
-                ))}
-            </View>
+                    <Text style={styles.headerTitle}>
+                        {currentYear}年 {MONTHS[currentMonth]}
+                    </Text>
+                    <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
+                        <Text style={styles.navButtonText}>▶</Text>
+                    </TouchableOpacity>
+                </View>
 
-            {/* 選択日の記録 */}
-            <View style={styles.recordsSection}>
-                <Text style={styles.recordsTitle}>
-                    📅 {selectedDate} の鑑賞記録
-                </Text>
-                {selectedRecords.length > 0 ? (
-                    selectedRecords.map((record) => (
-                        <View key={record.id} style={styles.recordItem}>
-                            <Text style={styles.recordMovieTitle}>{record.movie_title}</Text>
-                            {record.rating && (
-                                <Text style={styles.recordRating}>
-                                    {'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}
-                                </Text>
-                            )}
+                {/* 曜日ヘッダー */}
+                <View style={styles.weekHeader}>
+                    {DAYS.map((day, index) => (
+                        <View key={day} style={styles.weekDay}>
+                            <Text
+                                style={[
+                                    styles.weekDayText,
+                                    index === 0 && styles.sundayText,
+                                    index === 6 && styles.saturdayText,
+                                ]}
+                            >
+                                {day}
+                            </Text>
                         </View>
-                    ))
-                ) : (
-                    <View style={styles.emptyRecord}>
-                        <Text style={styles.emptyRecordText}>
-                            この日の鑑賞記録はありません
-                        </Text>
-                        <Text style={styles.emptyRecordHint}>
-                            映画を見たら記録しましょう！
-                        </Text>
-                    </View>
-                )}
-            </View>
+                    ))}
+                </View>
 
-            {/* 統計 */}
-            <View style={styles.statsSection}>
-                <Text style={styles.statsTitle}>📊 今月の鑑賞統計</Text>
-                <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>
-                            {records.filter((r) => {
-                                const date = new Date(r.watched_at);
-                                return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
-                            }).length}
-                        </Text>
-                        <Text style={styles.statLabel}>本</Text>
+                {/* カレンダーグリッド */}
+                <View style={styles.calendarGrid}>
+                    {calendarDays.map((day, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.dayCell,
+                                day && isToday(day) && styles.todayCell,
+                                day &&
+                                selectedDate ===
+                                `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` &&
+                                styles.selectedCell,
+                            ]}
+                            onPress={() => day && handleDayPress(day)}
+                            disabled={!day}
+                        >
+                            {day && (
+                                <>
+                                    <Text
+                                        style={[
+                                            styles.dayText,
+                                            index % 7 === 0 && styles.sundayText,
+                                            index % 7 === 6 && styles.saturdayText,
+                                            isToday(day) && styles.todayText,
+                                        ]}
+                                    >
+                                        {day}
+                                    </Text>
+                                    {hasRecord(day) && <View style={styles.recordDot} />}
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* 選択日の記録 */}
+                <View style={styles.recordsSection}>
+                    <Text style={styles.recordsTitle}>
+                        {selectedDate}
+                    </Text>
+                    {selectedRecords.length > 0 ? (
+                        selectedRecords.map((record) => (
+                            <View key={record.id} style={styles.recordItem}>
+                                <Text style={styles.recordMovieTitle}>{record.movie_title}</Text>
+                                {record.rating && (
+                                    <Text style={styles.recordRating}>
+                                        {'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}
+                                    </Text>
+                                )}
+                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.emptyRecord}>
+                            <Text style={styles.emptyRecordText}>
+                                この日の鑑賞記録はありません
+                            </Text>
+                            <Text style={styles.emptyRecordHint}>
+                                映画を見たら記録しましょう！
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* 統計 */}
+                <View style={styles.statsSection}>
+                    <Text style={styles.statsTitle}>MONTHLY STATS</Text>
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statNumber}>
+                                {records.filter((r) => {
+                                    const date = new Date(r.watched_at);
+                                    return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+                                }).length}
+                            </Text>
+                            <Text style={styles.statLabel}>本</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -184,6 +195,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,
+    },
+    scrollView: {
+        flex: 1,
     },
     header: {
         flexDirection: 'row',

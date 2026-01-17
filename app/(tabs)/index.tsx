@@ -1,8 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { MovieCard } from '../../components/MovieCard';
+import { MoodSection } from '../../components/MoodSection';
+import { BirthdaySection } from '../../components/BirthdaySection';
+import { AnniversarySection } from '../../components/AnniversarySection';
+import { TriviaSection } from '../../components/TriviaSection';
 import {
     getPopularMovies,
     getNowPlayingMovies,
@@ -10,11 +16,17 @@ import {
     getTrendingMovies,
     getUpcomingMovies,
     getMoviesByGenre,
+    getMoviesByMood,
+    getPersonCredits,
+    getAnniversaryMovies,
+    getMovieTrivia,
     searchMovies,
     getImageUrl,
     GENRES,
 } from '../../services/tmdb';
 import { Movie } from '../../types';
+import { MOOD_CATEGORIES, MoodCategory, getDailyMoodSeed } from '../../data/moodCategories';
+import { getTodayBirthdayPeople, BirthdayPerson } from '../../data/birthdayPeople';
 
 interface GenreSection {
     key: string;
@@ -30,6 +42,7 @@ const GENRE_ORDER = [
 ];
 
 export default function HomeScreen() {
+    const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Movie[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -37,25 +50,27 @@ export default function HomeScreen() {
     const [nowPlayingMovies, setNowPlayingMovies] = useState<Movie[]>([]);
     const [upcomingMovies, setUpcomingMovies] = useState<Movie[]>([]);
     const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
-    const [dailyPick, setDailyPick] = useState<Movie | null>(null);
     const [genreSections, setGenreSections] = useState<GenreSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [loadedGenreCount, setLoadedGenreCount] = useState(5);
 
-    // 日付ベースで映画を選択（毎日変わる）
-    const selectDailyPick = useCallback((movies: Movie[]) => {
-        if (movies.length === 0) return;
-        const today = new Date();
-        const dayOfYear = Math.floor(
-            (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
-        );
-        // 評価7.5以上の映画からフィルタリング
-        const highRated = movies.filter(m => m.vote_average >= 7.5);
-        const pool = highRated.length > 0 ? highRated : movies;
-        const index = dayOfYear % pool.length;
-        setDailyPick(pool[index]);
-    }, []);
+    // スティッキー検索バー用の状態
+    const [isSearchBarSticky, setIsSearchBarSticky] = useState(false);
+    const searchBarOriginalY = useRef<number>(0);
+
+    // 新機能用ステート
+    const [moodMovies, setMoodMovies] = useState<{ mood: MoodCategory; movie: Movie | null }[]>([]);
+    const [birthdayPeople, setBirthdayPeople] = useState<{ person: BirthdayPerson; movies: Movie[] }[]>([]);
+    const [anniversaryMovies, setAnniversaryMovies] = useState<{ movie: Movie; years: number }[]>([]);
+    const [triviaMovie, setTriviaMovie] = useState<Movie | null>(null);
+    const [triviaData, setTriviaData] = useState<{
+        budget: number;
+        revenue: number;
+        productionCountries: string[];
+        productionCompanies: string[];
+        tagline: string;
+    } | null>(null);
 
     const fetchBaseData = useCallback(async () => {
         try {
@@ -69,12 +84,75 @@ export default function HomeScreen() {
             setNowPlayingMovies(nowPlaying.results || []);
             setUpcomingMovies(upcoming.results || []);
             setTopRatedMovies(topRated.results || []);
-            // 本日のおすすめを設定
-            selectDailyPick(topRated.results || []);
         } catch (err) {
             console.error('Failed to fetch base movies:', err);
         }
-    }, [selectDailyPick]);
+    }, []);
+
+    // 新機能: 気分別映画を取得
+    const fetchMoodMovies = useCallback(async () => {
+        try {
+            const moodResults = await Promise.all(
+                MOOD_CATEGORIES.map(async (mood) => {
+                    const seed = getDailyMoodSeed(mood.id);
+                    const movie = await getMoviesByMood(
+                        mood.genreIds,
+                        mood.excludeGenreIds || [],
+                        mood.minRating || 6.5,
+                        seed
+                    );
+                    return { mood, movie };
+                })
+            );
+            setMoodMovies(moodResults);
+        } catch (err) {
+            console.error('Failed to fetch mood movies:', err);
+        }
+    }, []);
+
+    // 新機能: 今日誕生日の映画人を取得
+    const fetchBirthdayPeople = useCallback(async () => {
+        try {
+            const todayPeople = getTodayBirthdayPeople();
+            const peopleWithMovies = await Promise.all(
+                todayPeople.slice(0, 3).map(async (person) => {
+                    const movies = await getPersonCredits(person.id);
+                    return { person, movies };
+                })
+            );
+            setBirthdayPeople(peopleWithMovies);
+        } catch (err) {
+            console.error('Failed to fetch birthday people:', err);
+        }
+    }, []);
+
+    // 新機能: アニバーサリー映画を取得
+    const fetchAnniversaryMovies = useCallback(async () => {
+        try {
+            const movies = await getAnniversaryMovies();
+            setAnniversaryMovies(movies);
+        } catch (err) {
+            console.error('Failed to fetch anniversary movies:', err);
+        }
+    }, []);
+
+    // 新機能: トリビア用映画を取得
+    const fetchTrivia = useCallback(async (movies: Movie[]) => {
+        try {
+            if (movies.length === 0) return;
+            const today = new Date();
+            const dayOfYear = Math.floor(
+                (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+            );
+            const movie = movies[dayOfYear % movies.length];
+            setTriviaMovie(movie);
+
+            const trivia = await getMovieTrivia(movie.id);
+            setTriviaData(trivia);
+        } catch (err) {
+            console.error('Failed to fetch trivia:', err);
+        }
+    }, []);
 
     const fetchGenreMovies = useCallback(async (genreKeys: string[]) => {
         const newSections: GenreSection[] = [];
@@ -106,12 +184,25 @@ export default function HomeScreen() {
     useEffect(() => {
         const init = async () => {
             setLoading(true);
-            await fetchBaseData();
+            // 基本データと新機能データを並列で取得
+            await Promise.all([
+                fetchBaseData(),
+                fetchMoodMovies(),
+                fetchBirthdayPeople(),
+                fetchAnniversaryMovies(),
+            ]);
             await fetchGenreMovies(GENRE_ORDER.slice(0, loadedGenreCount));
             setLoading(false);
         };
         init();
     }, []);
+
+    // 基本データ取得後にトリビアを取得
+    useEffect(() => {
+        if (topRatedMovies.length > 0) {
+            fetchTrivia(topRatedMovies);
+        }
+    }, [topRatedMovies, fetchTrivia]);
 
     // 検索処理
     const handleSearch = useCallback(async (query: string) => {
@@ -143,20 +234,47 @@ export default function HomeScreen() {
         setRefreshing(true);
         setGenreSections([]);
         setLoadedGenreCount(5);
-        await fetchBaseData();
+        await Promise.all([
+            fetchBaseData(),
+            fetchMoodMovies(),
+            fetchBirthdayPeople(),
+            fetchAnniversaryMovies(),
+        ]);
         await fetchGenreMovies(GENRE_ORDER.slice(0, 5));
         setRefreshing(false);
-    }, [fetchBaseData, fetchGenreMovies]);
+    }, [fetchBaseData, fetchMoodMovies, fetchBirthdayPeople, fetchAnniversaryMovies, fetchGenreMovies]);
 
     const handleMoviePress = (movie: Movie) => {
         router.push(`/movie/${movie.id}`);
     };
 
-    const handleScroll = (event: any) => {
+    const handlePersonPress = (personId: number) => {
+        router.push(`/person/${personId}`);
+    };
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
         const paddingToBottom = 500;
+
+        // 無限スクロール
         if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
             loadMoreGenres();
+        }
+
+        // スティッキー検索バーの判定
+        // 検索バーの元の位置がヘッダーの下に到達したらスティッキーにする
+        const stickyThreshold = searchBarOriginalY.current - HEADER_HEIGHT - insets.top;
+        if (contentOffset.y >= stickyThreshold && searchBarOriginalY.current > 0) {
+            if (!isSearchBarSticky) setIsSearchBarSticky(true);
+        } else {
+            if (isSearchBarSticky) setIsSearchBarSticky(false);
+        }
+    };
+
+    const handleSearchBarLayout = (event: LayoutChangeEvent) => {
+        if (searchBarOriginalY.current === 0) {
+            // contentContainerStyle の paddingTop を考慮した絶対位置
+            searchBarOriginalY.current = event.nativeEvent.layout.y;
         }
     };
 
@@ -195,29 +313,56 @@ export default function HomeScreen() {
 
     return (
         <View style={styles.container}>
-            {/* 検索バー */}
-            <View style={styles.searchContainer}>
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="SEARCH MOVIES..."
-                    placeholderTextColor={Colors.light.textMuted}
-                    value={searchQuery}
-                    onChangeText={handleSearch}
-                    returnKeyType="search"
-                />
-                {searchQuery.length > 0 && (
-                    <TouchableOpacity
-                        style={styles.clearButton}
-                        onPress={() => handleSearch('')}
-                    >
-                        <Text style={styles.clearButtonText}>×</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+            {/* 固定ヘッダー */}
+            <StaticHeader title="シネマ管理くん〜 話、聞こか？ 〜" />
+
+            {/* スティッキー検索バーオーバーレイ（スクロールで固定表示） */}
+            {isSearchBarSticky && !isSearching && (
+                <View style={[styles.stickySearchOverlay, { top: HEADER_HEIGHT + insets.top }]}>
+                    <Text style={styles.searchSectionTitle}>SEARCH MOVIES</Text>
+                    <View style={styles.searchBarInner}>
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="SEARCH MOVIES..."
+                            placeholderTextColor={Colors.light.textMuted}
+                            value={searchQuery}
+                            onChangeText={handleSearch}
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                style={styles.clearButton}
+                                onPress={() => handleSearch('')}
+                            >
+                                <Text style={styles.clearButtonText}>×</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+            )}
 
             {/* 検索結果表示 */}
             {isSearching ? (
-                <ScrollView style={styles.searchResults}>
+                <ScrollView style={[styles.searchResults, { marginTop: HEADER_HEIGHT + insets.top + 16 }]}>
+                    <View style={styles.searchBarInner}>
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="SEARCH MOVIES..."
+                            placeholderTextColor={Colors.light.textMuted}
+                            value={searchQuery}
+                            onChangeText={handleSearch}
+                            returnKeyType="search"
+                            autoFocus
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                style={styles.clearButton}
+                                onPress={() => handleSearch('')}
+                            >
+                                <Text style={styles.clearButtonText}>×</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                     <Text style={styles.searchResultsTitle}>
                         RESULTS ({searchResults.length})
                     </Text>
@@ -236,8 +381,9 @@ export default function HomeScreen() {
             ) : (
                 <ScrollView
                     style={styles.scrollView}
+                    contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top }}
                     onScroll={handleScroll}
-                    scrollEventThrottle={400}
+                    scrollEventThrottle={16}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -246,38 +392,61 @@ export default function HomeScreen() {
                         />
                     }
                 >
-                    {/* 本日のおすすめ */}
-                    {dailyPick && (
-                        <TouchableOpacity
-                            style={styles.dailyPickContainer}
-                            onPress={() => handleMoviePress(dailyPick)}
-                        >
-                            <Text style={styles.dailyPickLabel}>TODAY'S PICK</Text>
-                            <View style={styles.dailyPickContent}>
-                                {dailyPick.poster_path && (
-                                    <Image
-                                        source={{ uri: getImageUrl(dailyPick.poster_path, 'w185') || '' }}
-                                        style={styles.dailyPickPoster}
-                                    />
-                                )}
-                                <View style={styles.dailyPickInfo}>
-                                    <Text style={styles.dailyPickTitle}>{dailyPick.title}</Text>
-                                    <Text style={styles.dailyPickOverview} numberOfLines={4}>
-                                        {dailyPick.overview}
-                                    </Text>
-                                    <View style={styles.dailyPickMeta}>
-                                        <Text style={styles.dailyPickRating}>
-                                            ★ {dailyPick.vote_average.toFixed(1)}
-                                        </Text>
-                                        <Text style={styles.dailyPickYear}>
-                                            {dailyPick.release_date?.split('-')[0]}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    )}
+                    {/* ===== 新機能セクション ===== */}
 
+                    {/* 1. 気分で選ぶ5選 */}
+                    <MoodSection
+                        moodMovies={moodMovies}
+                        onMoviePress={handleMoviePress}
+                    />
+
+                    {/* 2. 今日誕生日の映画人 */}
+                    <BirthdaySection
+                        birthdayPeople={birthdayPeople}
+                        onPersonPress={handlePersonPress}
+                        onMoviePress={handleMoviePress}
+                    />
+
+                    {/* 3. 名作アニバーサリー */}
+                    <AnniversarySection
+                        anniversaryMovies={anniversaryMovies}
+                        onMoviePress={handleMoviePress}
+                    />
+
+                    {/* 4. 今日のトリビア */}
+                    <TriviaSection
+                        movie={triviaMovie}
+                        trivia={triviaData}
+                        onMoviePress={handleMoviePress}
+                    />
+
+                    {/* 5. 検索バー（TRENDINGの前に配置、スティッキー） */}
+                    <View
+                        style={styles.inlineSearchWrapper}
+                        onLayout={handleSearchBarLayout}
+                    >
+                        <Text style={styles.searchSectionTitle}>SEARCH MOVIES</Text>
+                        <View style={styles.searchBarInner}>
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="SEARCH MOVIES..."
+                                placeholderTextColor={Colors.light.textMuted}
+                                value={searchQuery}
+                                onChangeText={handleSearch}
+                                returnKeyType="search"
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity
+                                    style={styles.clearButton}
+                                    onPress={() => handleSearch('')}
+                                >
+                                    <Text style={styles.clearButtonText}>×</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* ===== 既存セクション ===== */}
                     {renderSection('TRENDING', trendingMovies, true)}
                     {renderSection('NOW PLAYING', nowPlayingMovies)}
                     {renderSection('COMING SOON', upcomingMovies)}
@@ -394,61 +563,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 32,
     },
-    // 本日のおすすめ
-    dailyPickContainer: {
-        marginHorizontal: 20,
-        marginTop: 20,
+    // スティッキー検索バーオーバーレイ（position: fixed）
+    stickySearchOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        backgroundColor: Colors.light.background,
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+    // インライン検索バー（通常の配置）
+    inlineSearchWrapper: {
+        backgroundColor: Colors.light.background,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 12,
         marginBottom: 8,
-        padding: 20,
+    },
+    searchBarInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: Colors.light.surface,
         borderRadius: 4,
         borderWidth: 1,
         borderColor: Colors.light.border,
     },
-    dailyPickLabel: {
-        fontSize: 10,
-        fontWeight: '600',
-        letterSpacing: 2,
-        color: Colors.light.textMuted,
-        marginBottom: 16,
-    },
-    dailyPickContent: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    dailyPickPoster: {
-        width: 80,
-        height: 120,
-        borderRadius: 2,
-    },
-    dailyPickInfo: {
-        flex: 1,
-    },
-    dailyPickTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: Colors.light.primary,
-        marginBottom: 8,
-        letterSpacing: 0.5,
-    },
-    dailyPickOverview: {
-        fontSize: 12,
-        lineHeight: 18,
-        color: Colors.light.textMuted,
-        marginBottom: 12,
-    },
-    dailyPickMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    dailyPickRating: {
+    searchSectionTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: Colors.light.star,
-    },
-    dailyPickYear: {
-        fontSize: 12,
-        color: Colors.light.textMuted,
+        letterSpacing: 2,
+        color: Colors.light.primary,
+        marginBottom: 12,
     },
 });

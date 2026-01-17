@@ -28,7 +28,7 @@ export function MovieCard({ movie, onPress, size = 'normal' }: MovieCardProps) {
                     <Image source={{ uri: imageUrl }} style={styles.poster} />
                 ) : (
                     <View style={styles.placeholder}>
-                        <Text style={styles.placeholderText}>🎬</Text>
+                        <Text style={styles.placeholderText}>MOVIE</Text>
                     </View>
                 )}
             </View>

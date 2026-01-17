@@ -6,12 +6,16 @@ import {
     TextInput,
     ActivityIndicator,
     Alert,
+    ScrollView,
 } from 'react-native';
 import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import { useAuthStore } from '../../stores/authStore';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
 
 export default function ProfileScreen() {
+    const insets = useSafeAreaInsets();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -61,51 +65,59 @@ export default function ProfileScreen() {
     if (isAuthenticated && user) {
         return (
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <View style={styles.avatarContainer}>
-                        <Text style={styles.avatarText}>👤</Text>
-                    </View>
-                    <Text style={styles.userName}>{user.display_name || 'ユーザー'}</Text>
-                    <Text style={styles.userEmail}>{user.email}</Text>
-                </View>
+                {/* 固定ヘッダー */}
+                <StaticHeader title="PROFILE" />
 
-                {/* 統計 */}
-                <View style={styles.statsContainer}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>0</Text>
-                        <Text style={styles.statLabel}>鑑賞数</Text>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top }}
+                >
+                    <View style={styles.header}>
+                        <View style={styles.avatarContainer}>
+                            <Text style={styles.avatarText}>USER</Text>
+                        </View>
+                        <Text style={styles.userName}>{user.display_name || 'ユーザー'}</Text>
+                        <Text style={styles.userEmail}>{user.email}</Text>
                     </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>0</Text>
-                        <Text style={styles.statLabel}>レビュー</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>0</Text>
-                        <Text style={styles.statLabel}>お気に入り</Text>
-                    </View>
-                </View>
 
-                {/* メニュー */}
-                <View style={styles.menuContainer}>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuText}>📝 プロフィール編集</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuText}>⭐ お気に入り</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuText}>📋 あとで見るリスト</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Text style={styles.menuText}>⚙️ 設定</Text>
-                    </TouchableOpacity>
-                </View>
+                    {/* 統計 */}
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statNumber}>0</Text>
+                            <Text style={styles.statLabel}>鑑賞数</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statNumber}>0</Text>
+                            <Text style={styles.statLabel}>レビュー</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statNumber}>0</Text>
+                            <Text style={styles.statLabel}>お気に入り</Text>
+                        </View>
+                    </View>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-                    <Text style={styles.logoutButtonText}>ログアウト</Text>
-                </TouchableOpacity>
+                    {/* メニュー */}
+                    <View style={styles.menuContainer}>
+                        <TouchableOpacity style={styles.menuItem}>
+                            <Text style={styles.menuText}>EDIT PROFILE</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.menuItem}>
+                            <Text style={styles.menuText}>FAVORITES</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.menuItem}>
+                            <Text style={styles.menuText}>WATCHLIST</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.menuItem}>
+                            <Text style={styles.menuText}>SETTINGS</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
+                        <Text style={styles.logoutButtonText}>ログアウト</Text>
+                    </TouchableOpacity>
+                </ScrollView>
             </View>
         );
     }
@@ -113,62 +125,70 @@ export default function ProfileScreen() {
     // 未ログイン状態（ログイン/新規登録フォーム）
     return (
         <View style={styles.container}>
-            <View style={styles.authContainer}>
-                <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>🎬</Text>
-                </View>
-                <Text style={styles.authTitle}>
-                    {isLogin ? 'ログイン' : '新規登録'}
-                </Text>
-                <Text style={styles.authDescription}>
-                    CineTalkで映画の感想を共有しよう
-                </Text>
+            {/* 固定ヘッダー */}
+            <StaticHeader title="PROFILE" />
 
-                <View style={styles.formContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="メールアドレス"
-                        placeholderTextColor={Colors.light.textMuted}
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="パスワード"
-                        placeholderTextColor={Colors.light.textMuted}
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top, flex: 1 }}
+            >
+                <View style={styles.authContainer}>
+                    <View style={styles.avatarContainer}>
+                        <Text style={styles.avatarText}>APP</Text>
+                    </View>
+                    <Text style={styles.authTitle}>
+                        {isLogin ? 'ログイン' : '新規登録'}
+                    </Text>
+                    <Text style={styles.authDescription}>
+                        シネマ管理くんで映画の感想を共有しよう
+                    </Text>
 
-                    <TouchableOpacity
-                        style={[styles.authButton, localLoading && styles.authButtonDisabled]}
-                        onPress={handleAuth}
-                        disabled={localLoading}
-                    >
-                        {localLoading ? (
-                            <ActivityIndicator color="#FFF" />
-                        ) : (
-                            <Text style={styles.authButtonText}>
-                                {isLogin ? 'ログイン' : '新規登録'}
+                    <View style={styles.formContainer}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="メールアドレス"
+                            placeholderTextColor={Colors.light.textMuted}
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="パスワード"
+                            placeholderTextColor={Colors.light.textMuted}
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.authButton, localLoading && styles.authButtonDisabled]}
+                            onPress={handleAuth}
+                            disabled={localLoading}
+                        >
+                            {localLoading ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.authButtonText}>
+                                    {isLogin ? 'ログイン' : '新規登録'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.switchButton}
+                            onPress={() => setIsLogin(!isLogin)}
+                        >
+                            <Text style={styles.switchButtonText}>
+                                {isLogin
+                                    ? 'アカウントをお持ちでないですか？ 新規登録'
+                                    : 'すでにアカウントをお持ちですか？ ログイン'}
                             </Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.switchButton}
-                        onPress={() => setIsLogin(!isLogin)}
-                    >
-                        <Text style={styles.switchButtonText}>
-                            {isLogin
-                                ? 'アカウントをお持ちでないですか？ 新規登録'
-                                : 'すでにアカウントをお持ちですか？ ログイン'}
-                        </Text>
-                    </TouchableOpacity>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
         </View>
     );
 }
@@ -177,6 +197,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,
+    },
+    scrollView: {
+        flex: 1,
     },
     loadingContainer: {
         flex: 1,

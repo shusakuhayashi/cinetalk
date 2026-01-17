@@ -8,11 +8,13 @@ import {
     ActivityIndicator,
     Dimensions,
     Linking,
+    Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
-import { getMovieDetails, getRecommendations, getImageUrl } from '../../services/tmdb';
+import { getMovieDetails, getRecommendations, getImageUrl, getWatchProviders, getProviderUrl, WatchProvider, WatchProviderResult } from '../../services/tmdb';
 import { MovieDetails, Movie } from '../../types';
 import { MovieCard } from '../../components/MovieCard';
 import { ReviewModal } from '../../components/ReviewModal';
@@ -20,15 +22,21 @@ import { ReviewList } from '../../components/ReviewList';
 import { useMovieListStore } from '../../stores/movieListStore';
 import { useReviewStore } from '../../stores/reviewStore';
 import { useChatStore } from '../../stores/chatStore';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
+import { VoiceInputModal } from '../../components/VoiceInputModal';
+import { voiceRecognition } from '../../services/voiceRecognition';
 
 const { width } = Dimensions.get('window');
 
 export default function MovieDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const insets = useSafeAreaInsets();
     const [movie, setMovie] = useState<MovieDetails | null>(null);
     const [recommendations, setRecommendations] = useState<Movie[]>([]);
     const [loading, setLoading] = useState(true);
     const [showReviewModal, setShowReviewModal] = useState(false);
+    const [showVoiceModal, setShowVoiceModal] = useState(false);
+    const [watchProviders, setWatchProviders] = useState<WatchProviderResult | null>(null);
 
     const { isFavorite, isInWatchlist, addFavorite, removeFavorite, addToWatchlist, removeFromWatchlist } = useMovieListStore();
     const { getReviewByMovieId } = useReviewStore();
@@ -46,12 +54,14 @@ export default function MovieDetailScreen() {
 
     const fetchMovieData = async (movieId: number) => {
         try {
-            const [details, recs] = await Promise.all([
+            const [details, recs, providers] = await Promise.all([
                 getMovieDetails(movieId),
                 getRecommendations(movieId),
+                getWatchProviders(movieId),
             ]);
             setMovie(details);
             setRecommendations(recs.results || []);
+            setWatchProviders(providers);
         } catch (error) {
             console.error('Failed to fetch movie:', error);
         } finally {
@@ -120,6 +130,26 @@ export default function MovieDetailScreen() {
         router.push('/(tabs)/chat');
     };
 
+    // 音声入力で感想を始める
+    const handleTalkAboutMovie = () => {
+        if (!movie) return;
+
+        // 音声入力がサポートされているかチェック
+        if (!voiceRecognition.isSupported()) {
+            Alert.alert(
+                '音声入力非対応',
+                'このブラウザ/デバイスでは音声入力がサポートされていません\nチャット画面でテキスト入力で感想を書けます',
+                [
+                    { text: 'キャンセル', style: 'cancel' },
+                    { text: 'チャットへ', onPress: handleStartChat },
+                ]
+            );
+            return;
+        }
+
+        setShowVoiceModal(true);
+    };
+
     const handleRecommendationPress = (rec: Movie) => {
         router.push(`/movie/${rec.id}`);
     };
@@ -146,8 +176,15 @@ export default function MovieDetailScreen() {
     const cast = movie.credits?.cast?.slice(0, 10) || [];
 
     return (
-        <>
-            <ScrollView style={styles.container} bounces={false}>
+        <View style={styles.screenContainer}>
+            {/* 固定ヘッダー */}
+            <StaticHeader title="シネマ管理くん〜 話、聞こか？ 〜" showBackButton />
+
+            <ScrollView
+                style={styles.container}
+                bounces={false}
+                contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top }}
+            >
                 {/* バックドロップ画像 */}
                 <View style={styles.backdropContainer}>
                     {backdropUrl ? (
@@ -165,7 +202,7 @@ export default function MovieDetailScreen() {
                             <Image source={{ uri: posterUrl }} style={styles.poster} />
                         ) : (
                             <View style={[styles.poster, styles.posterPlaceholder]}>
-                                <Text style={styles.posterPlaceholderText}>🎬</Text>
+                                <Text style={styles.posterPlaceholderText}>MOVIE</Text>
                             </View>
                         )}
                     </View>
@@ -211,48 +248,114 @@ export default function MovieDetailScreen() {
                     </View>
                 )}
 
-                {/* アクションボタン */}
-                <View style={styles.actionButtons}>
+                {/* アクションボタン（小型アイコン） */}
+                <View style={styles.smallActionButtons}>
                     <TouchableOpacity
-                        style={[styles.actionButton, favorite && styles.actionButtonActive]}
+                        style={[styles.smallActionButton, favorite && styles.smallActionButtonActive]}
                         onPress={handleFavoriteToggle}
                     >
-                        <Text style={[styles.actionButtonIcon, favorite && styles.actionButtonIconActive]}>
+                        <Text style={[styles.smallActionIcon, favorite && styles.smallActionIconActive]}>
                             {favorite ? '♥' : '♡'}
-                        </Text>
-                        <Text style={[styles.actionButtonText, favorite && styles.actionButtonTextActive]}>
-                            お気に入り
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.actionButton, inWatchlist && styles.actionButtonActive]}
+                        style={[styles.smallActionButton, inWatchlist && styles.smallActionButtonActive]}
                         onPress={handleWatchlistToggle}
                     >
                         <View style={styles.tvIcon}>
                             <View style={[styles.tvScreen, inWatchlist && styles.tvScreenActive]} />
                             <View style={[styles.tvStand, inWatchlist && styles.tvStandActive]} />
                         </View>
-                        <Text style={[styles.actionButtonText, inWatchlist && styles.actionButtonTextActive]}>
-                            あとで見る
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.actionButton, existingReview && styles.actionButtonActive]}
-                        onPress={handleStartChat}
-                    >
-                        <Text style={[styles.actionButtonIcon, existingReview && styles.actionButtonIconActive]}>
-                            ✎
-                        </Text>
-                        <Text style={[styles.actionButtonText, existingReview && styles.actionButtonTextActive]}>
-                            {existingReview ? '編集' : 'レビュー'}
-                        </Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* 視聴リンク */}
-                <TouchableOpacity style={styles.watchButton} onPress={handleWatchNow}>
-                    <Text style={styles.watchButtonText}>今すぐ視聴する</Text>
+                {/* メインCTA: この映画について話す */}
+                <TouchableOpacity style={styles.talkButton} onPress={handleTalkAboutMovie}>
+                    <Text style={styles.talkButtonIcon}>MIC</Text>
+                    <View style={styles.talkButtonContent}>
+                        <Text style={styles.talkButtonTitle}>この映画について話す</Text>
+                        <Text style={styles.talkButtonSubtitle}>AIがあなたの感想をレビューにまとめます</Text>
+                    </View>
                 </TouchableOpacity>
+
+                {/* 配信サービス */}
+                {watchProviders && (watchProviders.flatrate || watchProviders.rent || watchProviders.buy) && (
+                    <View style={styles.providersSection}>
+                        <Text style={styles.providersSectionTitle}>この映画を見る</Text>
+
+                        {/* 定額見放題 */}
+                        {watchProviders.flatrate && watchProviders.flatrate.length > 0 && (
+                            <View style={styles.providerCategory}>
+                                <Text style={styles.providerCategoryLabel}>見放題</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.providerList}>
+                                    {watchProviders.flatrate.map((provider) => (
+                                        <TouchableOpacity
+                                            key={provider.provider_id}
+                                            style={styles.providerItem}
+                                            onPress={() => Linking.openURL(getProviderUrl(provider.provider_id, movie.title, watchProviders?.link))}
+                                        >
+                                            <Image
+                                                source={{ uri: getImageUrl(provider.logo_path, 'w185')! }}
+                                                style={styles.providerLogo}
+                                            />
+                                            <Text style={styles.providerName} numberOfLines={1}>
+                                                {provider.provider_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* レンタル */}
+                        {watchProviders.rent && watchProviders.rent.length > 0 && (
+                            <View style={styles.providerCategory}>
+                                <Text style={styles.providerCategoryLabel}>レンタル</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.providerList}>
+                                    {watchProviders.rent.map((provider) => (
+                                        <TouchableOpacity
+                                            key={provider.provider_id}
+                                            style={styles.providerItem}
+                                            onPress={() => Linking.openURL(getProviderUrl(provider.provider_id, movie.title, watchProviders?.link))}
+                                        >
+                                            <Image
+                                                source={{ uri: getImageUrl(provider.logo_path, 'w185')! }}
+                                                style={styles.providerLogo}
+                                            />
+                                            <Text style={styles.providerName} numberOfLines={1}>
+                                                {provider.provider_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* 購入 */}
+                        {watchProviders.buy && watchProviders.buy.length > 0 && (
+                            <View style={styles.providerCategory}>
+                                <Text style={styles.providerCategoryLabel}>購入</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.providerList}>
+                                    {watchProviders.buy.map((provider) => (
+                                        <TouchableOpacity
+                                            key={provider.provider_id}
+                                            style={styles.providerItem}
+                                            onPress={() => Linking.openURL(getProviderUrl(provider.provider_id, movie.title, watchProviders?.link))}
+                                        >
+                                            <Image
+                                                source={{ uri: getImageUrl(provider.logo_path, 'w185')! }}
+                                                style={styles.providerLogo}
+                                            />
+                                            <Text style={styles.providerName} numberOfLines={1}>
+                                                {provider.provider_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* ジャンル */}
                 <View style={styles.section}>
@@ -305,7 +408,7 @@ export default function MovieDetailScreen() {
                                         />
                                     ) : (
                                         <View style={[styles.castImage, styles.castPlaceholder]}>
-                                            <Text style={styles.castPlaceholderText}>👤</Text>
+                                            <Text style={styles.castPlaceholderText}>-</Text>
                                         </View>
                                     )}
                                     <Text style={styles.castName} numberOfLines={1}>
@@ -322,7 +425,7 @@ export default function MovieDetailScreen() {
 
                 {/* みんなのレビュー（TMDb） */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📝 みんなのレビュー</Text>
+                    <Text style={styles.sectionTitle}>REVIEWS</Text>
                     <ReviewList movieId={movieId} />
                 </View>
 
@@ -341,22 +444,34 @@ export default function MovieDetailScreen() {
                 )}
 
                 <View style={styles.bottomSpacer} />
-            </ScrollView >
+            </ScrollView>
 
-            {/* レビューモーダル */}
-            < ReviewModal
-                visible={showReviewModal}
-                onClose={() => setShowReviewModal(false)
-                }
-                movieId={movieId}
-                movieTitle={movie.title}
-                moviePoster={movie.poster_path}
-            />
-        </>
+            {/* 音声入力モーダル */}
+            {movie && (
+                <VoiceInputModal
+                    visible={showVoiceModal}
+                    onClose={() => setShowVoiceModal(false)}
+                    movie={{
+                        id: movie.id,
+                        title: movie.title,
+                        poster_path: movie.poster_path,
+                        backdrop_path: movie.backdrop_path,
+                        release_date: movie.release_date,
+                        vote_average: movie.vote_average,
+                        vote_count: movie.vote_count,
+                        overview: movie.overview,
+                    } as Movie}
+                />
+            )}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    screenContainer: {
+        flex: 1,
+        backgroundColor: Colors.light.background,
+    },
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,
@@ -559,6 +674,69 @@ const styles = StyleSheet.create({
     tvStandActive: {
         backgroundColor: '#FFFFFF',
     },
+    // 小型アイコンボタン（お気に入り・あとで見る）
+    smallActionButtons: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        gap: 12,
+        marginBottom: 12,
+    },
+    smallActionButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.light.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+    },
+    smallActionButtonActive: {
+        backgroundColor: Colors.light.primary,
+        borderColor: Colors.light.primary,
+    },
+    smallActionIcon: {
+        fontSize: 20,
+        color: Colors.light.primary,
+    },
+    smallActionIconActive: {
+        color: '#FFFFFF',
+    },
+    // メインCTA: この映画について話す
+    talkButton: {
+        marginHorizontal: 20,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+        borderWidth: 2,
+        borderColor: Colors.light.accent,
+    },
+    talkButtonIcon: {
+        fontSize: 32,
+        marginRight: 16,
+    },
+    talkButtonContent: {
+        flex: 1,
+    },
+    talkButtonTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: Colors.light.primary,
+        marginBottom: 2,
+    },
+    talkButtonSubtitle: {
+        fontSize: 12,
+        color: Colors.light.textMuted,
+    },
     watchButton: {
         marginHorizontal: 20,
         backgroundColor: Colors.light.primary,
@@ -661,5 +839,48 @@ const styles = StyleSheet.create({
     },
     bottomSpacer: {
         height: 40,
+    },
+    // 配信サービスセクション
+    providersSection: {
+        marginHorizontal: 20,
+        marginBottom: 20,
+        padding: 16,
+        backgroundColor: Colors.light.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.light.border,
+    },
+    providersSectionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: Colors.light.primary,
+        marginBottom: 12,
+    },
+    providerCategory: {
+        marginBottom: 12,
+    },
+    providerCategoryLabel: {
+        fontSize: 12,
+        color: Colors.light.textMuted,
+        marginBottom: 8,
+    },
+    providerList: {
+        flexDirection: 'row',
+    },
+    providerItem: {
+        alignItems: 'center',
+        marginRight: 16,
+        width: 60,
+    },
+    providerLogo: {
+        width: 50,
+        height: 50,
+        borderRadius: 10,
+        marginBottom: 4,
+    },
+    providerName: {
+        fontSize: 10,
+        color: Colors.light.textMuted,
+        textAlign: 'center',
     },
 });

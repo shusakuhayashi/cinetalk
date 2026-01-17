@@ -72,7 +72,7 @@ export default function SearchScreen() {
                     </View>
                 ) : searched && results.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyEmoji}>🔍</Text>
+                        <Text style={styles.emptyEmoji}>?</Text>
                         <Text style={styles.emptyText}>
                             「{query}」の検索結果はありません
                         </Text>
@@ -89,7 +89,7 @@ export default function SearchScreen() {
                     />
                 ) : (
                     <View style={styles.hintContainer}>
-                        <Text style={styles.hintEmoji}>🎬</Text>
+                        <Text style={styles.hintEmoji}>SEARCH</Text>
                         <Text style={styles.hintText}>
                             映画タイトルを入力して検索してください
                         </Text>

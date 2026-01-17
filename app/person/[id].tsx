@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import {
     getPersonDetails,
@@ -21,6 +22,7 @@ import {
 } from '../../services/tmdb';
 import { Movie } from '../../types';
 import { MovieCard } from '../../components/MovieCard';
+import { StaticHeader, HEADER_HEIGHT } from '../../components/AnimatedHeader';
 
 // 共演者/関連人物
 interface RelatedPerson {
@@ -32,6 +34,7 @@ interface RelatedPerson {
 
 export default function PersonDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const insets = useSafeAreaInsets();
     const [person, setPerson] = useState<PersonDetails | null>(null);
     const [credits, setCredits] = useState<PersonCredits | null>(null);
     const [loading, setLoading] = useState(true);
@@ -162,141 +165,154 @@ export default function PersonDetailScreen() {
             person.known_for_department;
 
     return (
-        <ScrollView style={styles.container} bounces={false}>
-            {/* プロフィール */}
-            <View style={styles.profileSection}>
-                <View style={styles.profileImageContainer}>
-                    {profileUrl ? (
-                        <Image source={{ uri: profileUrl }} style={styles.profileImage} />
-                    ) : (
-                        <View style={styles.profilePlaceholder}>
-                            <Text style={styles.profilePlaceholderText}>👤</Text>
+        <View style={styles.screenContainer}>
+            {/* 固定ヘッダー */}
+            <StaticHeader title="シネマ管理くん〜 話、聞こか？ 〜" showBackButton />
+
+            <ScrollView
+                style={styles.container}
+                bounces={false}
+                contentContainerStyle={{ paddingTop: HEADER_HEIGHT + insets.top }}
+            >
+                {/* プロフィール */}
+                <View style={styles.profileSection}>
+                    <View style={styles.profileImageContainer}>
+                        {profileUrl ? (
+                            <Image source={{ uri: profileUrl }} style={styles.profileImage} />
+                        ) : (
+                            <View style={styles.profilePlaceholder}>
+                                <Text style={styles.profilePlaceholderText}>-</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={styles.name}>{person.name}</Text>
+                    <Text style={styles.department}>{departmentLabel}</Text>
+
+                    {/* 代表作表示（タップ可能） */}
+                    {featuredMovies.length > 0 && (
+                        <View style={styles.featuredWorksContainer}>
+                            <Text style={styles.featuredWorksLabel}>代表作</Text>
+                            <View style={styles.featuredWorksList}>
+                                {featuredMovies.map((movie, index) => (
+                                    <TouchableOpacity
+                                        key={movie.id}
+                                        onPress={() => handleMoviePress(movie)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.featuredWorkLink}>
+                                            {movie.title}{index < featuredMovies.length - 1 ? '、' : ''}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
                     )}
-                </View>
-                <Text style={styles.name}>{person.name}</Text>
-                <Text style={styles.department}>{departmentLabel}</Text>
 
-                {/* 代表作表示（タップ可能） */}
-                {featuredMovies.length > 0 && (
-                    <View style={styles.featuredWorksContainer}>
-                        <Text style={styles.featuredWorksLabel}>代表作</Text>
-                        <View style={styles.featuredWorksList}>
-                            {featuredMovies.map((movie, index) => (
-                                <TouchableOpacity
-                                    key={movie.id}
-                                    onPress={() => handleMoviePress(movie)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={styles.featuredWorkLink}>
-                                        {movie.title}{index < featuredMovies.length - 1 ? '、' : ''}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
+
+                    {/* 基本情報 */}
+                    {person.birthday && (
+                        <Text style={styles.birthInfo}>
+                            {person.birthday}{person.place_of_birth && ` - ${person.place_of_birth}`}
+                        </Text>
+                    )}
+                </View>
+
+                {/* 経歴 */}
+                {person.biography && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>PROFILE</Text>
+                        <View style={styles.biographyCard}>
+                            <Text style={styles.biography}>{person.biography}</Text>
                         </View>
                     </View>
                 )}
 
+                {/* 監督作品 */}
+                {directorMovies.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>DIRECTING ({directorMovies.length})</Text>
+                        <FlatList
+                            data={directorMovies.slice(0, 20)}
+                            renderItem={({ item }) => (
+                                <MovieCard movie={item} onPress={handleMoviePress} size="small" />
+                            )}
+                            keyExtractor={(item) => `director-${item.id}`}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.movieList}
+                            ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                        />
+                    </View>
+                )}
 
-                {/* 基本情報 */}
-                {person.birthday && (
-                    <Text style={styles.birthInfo}>
-                        🎂 {person.birthday}{person.place_of_birth && ` • ${person.place_of_birth}`}
+                {/* 出演作品 */}
+                {actorMovies.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>ACTING ({actorMovies.length})</Text>
+                        <FlatList
+                            data={actorMovies.slice(0, 20)}
+                            renderItem={({ item }) => (
+                                <MovieCard movie={item} onPress={handleMoviePress} size="small" />
+                            )}
+                            keyExtractor={(item) => `actor-${item.id}`}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.movieList}
+                            ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                        />
+                    </View>
+                )}
+
+                {/* 関連人物レコメンド */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>
+                        PEOPLE WHO MIGHT INTEREST YOU
                     </Text>
-                )}
-            </View>
-
-            {/* 経歴 */}
-            {person.biography && (
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📖 プロフィール</Text>
-                    <View style={styles.biographyCard}>
-                        <Text style={styles.biography}>{person.biography}</Text>
-                    </View>
+                    {loadingRelated ? (
+                        <View style={styles.relatedLoading}>
+                            <ActivityIndicator size="small" color={Colors.light.accent} />
+                            <Text style={styles.relatedLoadingText}>分析中...</Text>
+                        </View>
+                    ) : relatedPeople.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
+                            {relatedPeople.map((rp) => (
+                                <TouchableOpacity
+                                    key={rp.id}
+                                    style={styles.relatedPerson}
+                                    onPress={() => handlePersonPress(rp.id)}
+                                    activeOpacity={0.7}
+                                >
+                                    {rp.profile_path ? (
+                                        <Image
+                                            source={{ uri: getImageUrl(rp.profile_path, 'w185')! }}
+                                            style={styles.relatedImage}
+                                        />
+                                    ) : (
+                                        <View style={[styles.relatedImage, styles.relatedPlaceholder]}>
+                                            <Text style={styles.relatedPlaceholderText}>-</Text>
+                                        </View>
+                                    )}
+                                    <Text style={styles.relatedName} numberOfLines={2}>{rp.name}</Text>
+                                    <Text style={styles.relatedCount}>{rp.movies}作品で共演</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <Text style={styles.noRelatedText}>関連人物を探しています...</Text>
+                    )}
                 </View>
-            )}
 
-            {/* 監督作品 */}
-            {directorMovies.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🎬 監督作品（{directorMovies.length}作品）</Text>
-                    <FlatList
-                        data={directorMovies.slice(0, 20)}
-                        renderItem={({ item }) => (
-                            <MovieCard movie={item} onPress={handleMoviePress} size="small" />
-                        )}
-                        keyExtractor={(item) => `director-${item.id}`}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.movieList}
-                        ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-                    />
-                </View>
-            )}
-
-            {/* 出演作品 */}
-            {actorMovies.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🎭 出演作品（{actorMovies.length}作品）</Text>
-                    <FlatList
-                        data={actorMovies.slice(0, 20)}
-                        renderItem={({ item }) => (
-                            <MovieCard movie={item} onPress={handleMoviePress} size="small" />
-                        )}
-                        keyExtractor={(item) => `actor-${item.id}`}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.movieList}
-                        ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-                    />
-                </View>
-            )}
-
-            {/* 関連人物レコメンド */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                    💡 {person.name}が好きならこの人も
-                </Text>
-                {loadingRelated ? (
-                    <View style={styles.relatedLoading}>
-                        <ActivityIndicator size="small" color={Colors.light.accent} />
-                        <Text style={styles.relatedLoadingText}>分析中...</Text>
-                    </View>
-                ) : relatedPeople.length > 0 ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
-                        {relatedPeople.map((rp) => (
-                            <TouchableOpacity
-                                key={rp.id}
-                                style={styles.relatedPerson}
-                                onPress={() => handlePersonPress(rp.id)}
-                                activeOpacity={0.7}
-                            >
-                                {rp.profile_path ? (
-                                    <Image
-                                        source={{ uri: getImageUrl(rp.profile_path, 'w185')! }}
-                                        style={styles.relatedImage}
-                                    />
-                                ) : (
-                                    <View style={[styles.relatedImage, styles.relatedPlaceholder]}>
-                                        <Text style={styles.relatedPlaceholderText}>👤</Text>
-                                    </View>
-                                )}
-                                <Text style={styles.relatedName} numberOfLines={2}>{rp.name}</Text>
-                                <Text style={styles.relatedCount}>{rp.movies}作品で共演</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                ) : (
-                    <Text style={styles.noRelatedText}>関連人物を探しています...</Text>
-                )}
-            </View>
-
-            <View style={styles.bottomSpacer} />
-        </ScrollView>
+                <View style={styles.bottomSpacer} />
+            </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    screenContainer: {
+        flex: 1,
+        backgroundColor: Colors.light.background,
+    },
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,

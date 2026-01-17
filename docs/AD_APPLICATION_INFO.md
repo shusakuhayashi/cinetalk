@@ -1,10 +1,10 @@
-# CineTalk 広告・アフィリエイト申請情報
+# シネマ管理くん 広告・アフィリエイト申請情報
 
 ## 📋 アプリ基本情報
 
 | 項目 | 内容 |
 |------|------|
-| **アプリ名** | CineTalk（シネトーク） |
+| **アプリ名** | シネマ管理くん〜話、聞こうか？〜 |
 | **アプリ種別** | 映画レビュー・発見アプリ |
 | **プラットフォーム** | iOS / Android（React Native + Expo） |
 | **App Store URL** | XXXXX（公開後に記入） |
@@ -17,10 +17,10 @@
 ## 📝 アプリ説明文（申請用）
 
 ### 日本語
-CineTalkは、映画の感想を投稿・共有できるモバイルアプリです。AIと雑談しながら映画の感想を言語化したり、気分に合った映画をおすすめしてもらえます。映画好きのためのパーソナライズされた鑑賞体験を提供します。
+シネマ管理くんは、映画の感想を投稿・共有できるモバイルアプリです。AIと雑談しながら映画の感想を言語化したり、気分に合った映画をおすすめしてもらえます。映画好きのためのパーソナライズされた鑑賞体験を提供します。
 
 ### English
-CineTalk is a mobile app for posting and sharing movie reviews. Chat with AI to articulate your thoughts about movies, get personalized recommendations based on your mood and viewing history. A curated movie experience for film enthusiasts.
+Cinema Kanrikun is a mobile app for posting and sharing movie reviews. Chat with AI to articulate your thoughts about movies, get personalized recommendations based on your mood and viewing history. A curated movie experience for film enthusiasts.
 
 ---
 
