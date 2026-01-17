@@ -201,24 +201,26 @@ export default function ChatScreen() {
     const saveReviewAndRecord = async (reviewText: string) => {
         if (!selectedMovie) return;
 
-        // タグIDからラベルに変換
-        const tagLabels = selectedTags.map(
-            (tagId) => EMOTION_TAGS.find((t) => t.id === tagId)?.label || tagId
-        );
+        // タグIDからラベルに変換（ReviewTag型にキャスト）
+        const tagLabels = selectedTags
+            .map((tagId) => EMOTION_TAGS.find((t) => t.id === tagId)?.label)
+            .filter((label): label is string => !!label) as import('../../types').ReviewTag[];
 
         addReview({
-            movieId: selectedMovie.id,
+            movie_id: selectedMovie.id,
+            movie_title: selectedMovie.title,
             rating: selectedRating,
             content: reviewText || '感想を記録しました',
             tags: tagLabels,
+            watched_at: new Date().toISOString(),
         });
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString();
         addRecord({
-            date: today,
-            movieId: selectedMovie.id,
-            movieTitle: selectedMovie.title,
-            posterPath: selectedMovie.posterPath,
+            movie_id: selectedMovie.id,
+            movie_title: selectedMovie.title,
+            movie_poster: selectedMovie.posterPath,
+            watched_at: today,
         });
 
         setShowSaveModal(false);

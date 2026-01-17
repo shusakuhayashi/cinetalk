@@ -115,11 +115,11 @@ export default function CalendarScreen() {
                             key={index}
                             style={[
                                 styles.dayCell,
-                                day && isToday(day) && styles.todayCell,
+                                day && isToday(day) ? styles.todayCell : undefined,
                                 day &&
-                                selectedDate ===
-                                `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` &&
-                                styles.selectedCell,
+                                    selectedDate ===
+                                    `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                                    ? styles.selectedCell : undefined,
                             ]}
                             onPress={() => day && handleDayPress(day)}
                             disabled={!day}

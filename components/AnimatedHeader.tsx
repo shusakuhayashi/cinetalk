@@ -62,13 +62,13 @@ const ProfileIcon = () => {
                     source={{ uri: user.avatar_url }}
                     style={{ width: 28, height: 28, borderRadius: 14 }}
                 />
-            ) : isAuthenticated && user?.name ? (
+            ) : isAuthenticated && user?.display_name ? (
                 <Text style={{
                     fontSize: 12,
                     color: Colors.light.headerBg,
                     fontWeight: '600',
                 }}>
-                    {user.name.charAt(0).toUpperCase()}
+                    {user.display_name.charAt(0).toUpperCase()}
                 </Text>
             ) : (
                 // 未ログイン: 人マーク
@@ -133,14 +133,12 @@ export const HeaderProvider: React.FC<HeaderProviderProps> = ({ children }) => {
 
         // 最上部付近（100px以下）では常にヘッダーを表示
         if (currentScrollY < 100) {
-            if (translateY._value !== 0) {
-                Animated.spring(translateY, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    tension: 100,
-                    friction: 10,
-                }).start();
-            }
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                tension: 100,
+                friction: 10,
+            }).start();
             lastScrollY.current = currentScrollY;
             return;
         }

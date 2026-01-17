@@ -113,13 +113,18 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     const handleComplete = () => {
         stopListening();
 
-        // 映画をセット
+        // 映画をセット（chatStoreのSelectedMovie型に合わせる）
         setSelectedMovie({
             id: movie.id,
             title: movie.title,
+            originalTitle: movie.original_title,
             posterPath: movie.poster_path || '',
+            genres: [],
             directors: [],
+            cast: [],
+            overview: movie.overview || '',
             releaseDate: movie.release_date,
+            voteAverage: movie.vote_average || 0,
         });
 
         // 音声入力のテキストをメッセージとして追加
