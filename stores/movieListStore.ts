@@ -23,8 +23,10 @@ interface MovieListState {
     isInWatchlist: (movieId: number) => boolean;
     addFavorite: (item: Omit<FavoriteItem, 'id' | 'added_at'>) => void;
     removeFavorite: (movieId: number) => void;
+    toggleFavorite: (item: Omit<FavoriteItem, 'id' | 'added_at'>) => boolean; // true if added, false if removed
     addToWatchlist: (item: Omit<WatchlistItem, 'id' | 'added_at'>) => void;
     removeFromWatchlist: (movieId: number) => void;
+    toggleWatchlist: (item: Omit<WatchlistItem, 'id' | 'added_at'>) => boolean;
 }
 
 export const useMovieListStore = create<MovieListState>((set, get) => ({
@@ -56,6 +58,17 @@ export const useMovieListStore = create<MovieListState>((set, get) => ({
             favorites: state.favorites.filter((f) => f.movie_id !== movieId),
         })),
 
+    toggleFavorite: (item) => {
+        const isFav = get().isFavorite(item.movie_id);
+        if (isFav) {
+            get().removeFavorite(item.movie_id);
+            return false;
+        } else {
+            get().addFavorite(item);
+            return true;
+        }
+    },
+
     addToWatchlist: (item) =>
         set((state) => ({
             watchlist: [
@@ -72,4 +85,16 @@ export const useMovieListStore = create<MovieListState>((set, get) => ({
         set((state) => ({
             watchlist: state.watchlist.filter((w) => w.movie_id !== movieId),
         })),
+
+    toggleWatchlist: (item) => {
+        const isInList = get().isInWatchlist(item.movie_id);
+        if (isInList) {
+            get().removeFromWatchlist(item.movie_id);
+            return false;
+        } else {
+            get().addToWatchlist(item);
+            return true;
+        }
+    },
 }));
+

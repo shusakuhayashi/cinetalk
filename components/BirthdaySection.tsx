@@ -12,6 +12,7 @@ import { Movie } from '../types';
 import { getImageUrl } from '../services/tmdb';
 import { BirthdayPerson } from '../data/birthdayPeople';
 
+
 interface BirthdaySectionProps {
     birthdayPeople: {
         person: BirthdayPerson;
@@ -28,6 +29,37 @@ export const BirthdaySection: React.FC<BirthdaySectionProps> = ({
 }) => {
     if (birthdayPeople.length === 0) return null;
 
+    // 人物の誕生日と年齢をフォーマット
+    const formatBirthday = (person: BirthdayPerson) => {
+        const [month, day] = person.birthday.split('-').map(Number);
+
+        if (!person.birthYear) {
+            return `${month}月${day}日`;
+        }
+
+        const birthDate = `${person.birthYear}年${month}月${day}日`;
+
+        // 年齢または享年を計算
+        if (person.deathYear) {
+            // 故人の場合：享年を計算
+            const ageAtDeath = person.deathYear - person.birthYear;
+            return `${birthDate}（享年${ageAtDeath}歳）`;
+        } else {
+            // 存命の場合：現在の年齢を計算
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentDay = today.getDate();
+
+            let age = currentYear - person.birthYear;
+            // 今年の誕生日がまだ来ていない場合は1歳引く
+            if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+                age -= 1;
+            }
+            return `${birthDate}（${age}歳）`;
+        }
+    };
+
     return (
         <View style={styles.container}>
             <Text style={styles.sectionTitle}>HAPPY BIRTHDAY</Text>
@@ -38,7 +70,10 @@ export const BirthdaySection: React.FC<BirthdaySectionProps> = ({
                         onPress={() => onPersonPress(person.id)}
                     >
                         <View style={styles.personInfo}>
-                            <Text style={styles.personName}>{person.nameJa}</Text>
+                            <View style={styles.nameRow}>
+                                <Text style={styles.personName}>{person.nameJa}</Text>
+                                <Text style={styles.birthdayText}>{formatBirthday(person)}</Text>
+                            </View>
                             <Text style={styles.personEnglishName}>{person.name}</Text>
                             <View style={styles.personMeta}>
                                 <Text style={styles.personType}>
@@ -93,9 +128,6 @@ const styles = StyleSheet.create({
     container: {
         marginTop: 24,
         marginBottom: 24,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.light.border,
     },
     sectionTitle: {
         fontSize: 13,
@@ -122,11 +154,20 @@ const styles = StyleSheet.create({
     personInfo: {
         flex: 1,
     },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 2,
+    },
     personName: {
         fontSize: 18,
         fontWeight: '700',
         color: Colors.light.primary,
-        marginBottom: 2,
+    },
+    birthdayText: {
+        fontSize: 12,
+        color: Colors.light.textMuted,
     },
     personEnglishName: {
         fontSize: 12,

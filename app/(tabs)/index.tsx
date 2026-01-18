@@ -7,8 +7,7 @@ import { Colors } from '../../constants/Colors';
 import { MovieCard } from '../../components/MovieCard';
 import { MoodSection } from '../../components/MoodSection';
 import { BirthdaySection } from '../../components/BirthdaySection';
-import { AnniversarySection } from '../../components/AnniversarySection';
-import { TriviaSection } from '../../components/TriviaSection';
+import { Best5Section } from '../../components/Best5Section';
 import {
     getPopularMovies,
     getNowPlayingMovies,
@@ -18,8 +17,11 @@ import {
     getMoviesByGenre,
     getMoviesByMood,
     getPersonCredits,
-    getAnniversaryMovies,
-    getMovieTrivia,
+    getDirectorBest5,
+    getEraCountryBest5,
+    getHiddenGemBest5,
+    getWorldCinemaBest5,
+    getJapaneseMovieBest5,
     searchMovies,
     getImageUrl,
     GENRES,
@@ -27,6 +29,18 @@ import {
 import { Movie } from '../../types';
 import { MOOD_CATEGORIES, MoodCategory, getDailyMoodSeed } from '../../data/moodCategories';
 import { getTodayBirthdayPeople, BirthdayPerson } from '../../data/birthdayPeople';
+import {
+    getDailyDirector,
+    getDailyEraCountry,
+    getDailyHiddenGemGenre,
+    getDailyJapaneseMovieGenre,
+    getDailyWorldCinemaCountry,
+    DirectorData,
+    EraCountryData,
+    HiddenGemGenre,
+    JapaneseMovieGenre,
+    WorldCinemaCountry,
+} from '../../data/best3Categories';
 
 interface GenreSection {
     key: string;
@@ -62,15 +76,18 @@ export default function HomeScreen() {
     // 新機能用ステート
     const [moodMovies, setMoodMovies] = useState<{ mood: MoodCategory; movie: Movie | null }[]>([]);
     const [birthdayPeople, setBirthdayPeople] = useState<{ person: BirthdayPerson; movies: Movie[] }[]>([]);
-    const [anniversaryMovies, setAnniversaryMovies] = useState<{ movie: Movie; years: number }[]>([]);
-    const [triviaMovie, setTriviaMovie] = useState<Movie | null>(null);
-    const [triviaData, setTriviaData] = useState<{
-        budget: number;
-        revenue: number;
-        productionCountries: string[];
-        productionCompanies: string[];
-        tagline: string;
-    } | null>(null);
+
+    // Best5ランキング用ステート
+    const [dailyDirector, setDailyDirector] = useState<DirectorData | null>(null);
+    const [directorMovies, setDirectorMovies] = useState<Movie[]>([]);
+    const [dailyEraCountry, setDailyEraCountry] = useState<EraCountryData | null>(null);
+    const [eraCountryMovies, setEraCountryMovies] = useState<Movie[]>([]);
+    const [dailyHiddenGemGenre, setDailyHiddenGemGenre] = useState<HiddenGemGenre | null>(null);
+    const [hiddenGemMovies, setHiddenGemMovies] = useState<Movie[]>([]);
+    const [dailyWorldCinemaCountry, setDailyWorldCinemaCountry] = useState<WorldCinemaCountry | null>(null);
+    const [worldCinemaMovies, setWorldCinemaMovies] = useState<Movie[]>([]);
+    const [dailyJapaneseMovieGenre, setDailyJapaneseMovieGenre] = useState<JapaneseMovieGenre | null>(null);
+    const [japaneseMovies, setJapaneseMovies] = useState<Movie[]>([]);
 
     const fetchBaseData = useCallback(async () => {
         try {
@@ -126,31 +143,41 @@ export default function HomeScreen() {
         }
     }, []);
 
-    // 新機能: アニバーサリー映画を取得
-    const fetchAnniversaryMovies = useCallback(async () => {
-        try {
-            const movies = await getAnniversaryMovies();
-            setAnniversaryMovies(movies);
-        } catch (err) {
-            console.error('Failed to fetch anniversary movies:', err);
-        }
-    }, []);
 
-    // 新機能: トリビア用映画を取得
-    const fetchTrivia = useCallback(async (movies: Movie[]) => {
+    // Best5ランキングデータを取得
+    const fetchBest5Data = useCallback(async () => {
         try {
-            if (movies.length === 0) return;
-            const today = new Date();
-            const dayOfYear = Math.floor(
-                (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
-            );
-            const movie = movies[dayOfYear % movies.length];
-            setTriviaMovie(movie);
+            // 1. 今日の監督を取得
+            const director = getDailyDirector();
+            setDailyDirector(director);
+            const dirMovies = await getDirectorBest5(director.id);
+            setDirectorMovies(dirMovies);
 
-            const trivia = await getMovieTrivia(movie.id);
-            setTriviaData(trivia);
+            // 2. 今日の年代×国を取得
+            const eraCountry = getDailyEraCountry();
+            setDailyEraCountry(eraCountry);
+            const eraMovies = await getEraCountryBest5(eraCountry.countryCode, eraCountry.decade);
+            setEraCountryMovies(eraMovies);
+
+            // 3. 今日の隠れた名作ジャンルを取得
+            const hiddenGenre = getDailyHiddenGemGenre();
+            setDailyHiddenGemGenre(hiddenGenre);
+            const hiddenMovies = await getHiddenGemBest5(hiddenGenre.genreId);
+            setHiddenGemMovies(hiddenMovies);
+
+            // 4. 世界の映画を取得
+            const worldCountry = getDailyWorldCinemaCountry();
+            setDailyWorldCinemaCountry(worldCountry);
+            const worldMovies = await getWorldCinemaBest5(worldCountry.countryCode);
+            setWorldCinemaMovies(worldMovies);
+
+            // 5. 日本映画を取得
+            const japaneseGenre = getDailyJapaneseMovieGenre();
+            setDailyJapaneseMovieGenre(japaneseGenre);
+            const jpMovies = await getJapaneseMovieBest5(japaneseGenre.genreId);
+            setJapaneseMovies(jpMovies);
         } catch (err) {
-            console.error('Failed to fetch trivia:', err);
+            console.error('Failed to fetch best5 data:', err);
         }
     }, []);
 
@@ -189,7 +216,7 @@ export default function HomeScreen() {
                 fetchBaseData(),
                 fetchMoodMovies(),
                 fetchBirthdayPeople(),
-                fetchAnniversaryMovies(),
+                fetchBest5Data(),
             ]);
             await fetchGenreMovies(GENRE_ORDER.slice(0, loadedGenreCount));
             setLoading(false);
@@ -197,12 +224,7 @@ export default function HomeScreen() {
         init();
     }, []);
 
-    // 基本データ取得後にトリビアを取得
-    useEffect(() => {
-        if (topRatedMovies.length > 0) {
-            fetchTrivia(topRatedMovies);
-        }
-    }, [topRatedMovies, fetchTrivia]);
+
 
     // 検索処理
     const handleSearch = useCallback(async (query: string) => {
@@ -238,11 +260,11 @@ export default function HomeScreen() {
             fetchBaseData(),
             fetchMoodMovies(),
             fetchBirthdayPeople(),
-            fetchAnniversaryMovies(),
+            fetchBest5Data(),
         ]);
         await fetchGenreMovies(GENRE_ORDER.slice(0, 5));
         setRefreshing(false);
-    }, [fetchBaseData, fetchMoodMovies, fetchBirthdayPeople, fetchAnniversaryMovies, fetchGenreMovies]);
+    }, [fetchBaseData, fetchMoodMovies, fetchBirthdayPeople, fetchBest5Data, fetchGenreMovies]);
 
     const handleMoviePress = (movie: Movie) => {
         router.push(`/movie/${movie.id}`);
@@ -392,58 +414,78 @@ export default function HomeScreen() {
                         />
                     }
                 >
-                    {/* ===== 新機能セクション ===== */}
+                    {/* ===== TODAY'S セクション ===== */}
+                    <View style={styles.todaysSection}>
+                        {/* TODAY'S Picks バナー画像 */}
+                        <Image
+                            source={require('../../assets/todays-picks-banner.jpg')}
+                            style={styles.todaysBanner}
+                            resizeMode="stretch"
+                        />
 
-                    {/* 1. 気分で選ぶ5選 */}
-                    <MoodSection
-                        moodMovies={moodMovies}
-                        onMoviePress={handleMoviePress}
-                    />
+                        {/* Mood Picks */}
+                        <MoodSection
+                            moodMovies={moodMovies}
+                            onMoviePress={handleMoviePress}
+                        />
 
-                    {/* 2. 今日誕生日の映画人 */}
-                    <BirthdaySection
-                        birthdayPeople={birthdayPeople}
-                        onPersonPress={handlePersonPress}
-                        onMoviePress={handleMoviePress}
-                    />
+                        {/* Happy Birthday */}
+                        <BirthdaySection
+                            birthdayPeople={birthdayPeople}
+                            onPersonPress={handlePersonPress}
+                            onMoviePress={handleMoviePress}
+                        />
 
-                    {/* 3. 名作アニバーサリー */}
-                    <AnniversarySection
-                        anniversaryMovies={anniversaryMovies}
-                        onMoviePress={handleMoviePress}
-                    />
+                        {/* BEST5ランキング */}
+                        <Best5Section
+                            director={dailyDirector}
+                            directorMovies={directorMovies}
+                            eraCountry={dailyEraCountry}
+                            eraCountryMovies={eraCountryMovies}
+                            hiddenGemGenre={dailyHiddenGemGenre}
+                            hiddenGemMovies={hiddenGemMovies}
+                            worldCinemaCountry={dailyWorldCinemaCountry}
+                            worldCinemaMovies={worldCinemaMovies}
+                            japaneseMovieGenre={dailyJapaneseMovieGenre}
+                            japaneseMovies={japaneseMovies}
+                            onMoviePress={handleMoviePress}
+                        />
+                    </View>
 
-                    {/* 4. 今日のトリビア */}
-                    <TriviaSection
-                        movie={triviaMovie}
-                        trivia={triviaData}
-                        onMoviePress={handleMoviePress}
-                    />
+                    {/* セクション区切り線 */}
+                    <View style={styles.sectionDivider} />
 
-                    {/* 5. 検索バー（TRENDINGの前に配置、スティッキー） */}
+                    {/* 検索バー */}
                     <View
                         style={styles.inlineSearchWrapper}
                         onLayout={handleSearchBarLayout}
                     >
-                        <Text style={styles.searchSectionTitle}>SEARCH MOVIES</Text>
-                        <View style={styles.searchBarInner}>
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="SEARCH MOVIES..."
-                                placeholderTextColor={Colors.light.textMuted}
-                                value={searchQuery}
-                                onChangeText={handleSearch}
-                                returnKeyType="search"
-                            />
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity
-                                    style={styles.clearButton}
-                                    onPress={() => handleSearch('')}
-                                >
-                                    <Text style={styles.clearButtonText}>×</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
+                        {/* スティッキーモード時は透明のプレースホルダーのみ表示 */}
+                        {isSearchBarSticky ? (
+                            <View style={styles.searchPlaceholder} />
+                        ) : (
+                            <>
+                                <Text style={styles.searchSectionTitle}>SEARCH MOVIES</Text>
+                                <View style={styles.searchBarInner}>
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="SEARCH MOVIES..."
+                                        placeholderTextColor={Colors.light.textMuted}
+                                        value={searchQuery}
+                                        onChangeText={handleSearch}
+                                        returnKeyType="search"
+                                    />
+                                    {searchQuery.length > 0 && (
+                                        <TouchableOpacity
+                                            style={styles.clearButton}
+                                            onPress={() => handleSearch('')}
+                                        >
+                                            <Text style={styles.clearButtonText}>×</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </>
+                        )}
                     </View>
 
                     {/* ===== 既存セクション ===== */}
@@ -596,5 +638,26 @@ const styles = StyleSheet.create({
         letterSpacing: 2,
         color: Colors.light.primary,
         marginBottom: 12,
+    },
+    searchPlaceholder: {
+        height: 60, // SEARCH MOVIES title + input height
+    },
+    // TODAY'Sセクション
+    todaysSection: {
+        // paddingなし
+    },
+    todaysBanner: {
+        width: '100%',
+        height: 'auto',
+        aspectRatio: 1024 / 512, // 元画像の実際のアスペクト比
+        marginTop: 0,
+        marginBottom: 0,
+    },
+    // セクション区切り線
+    sectionDivider: {
+        height: 1,
+        backgroundColor: Colors.light.border,
+        marginHorizontal: 20,
+        marginVertical: 24,
     },
 });

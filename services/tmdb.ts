@@ -496,3 +496,132 @@ export const getMovieTrivia = async (movieId: number): Promise<{
     }
 };
 
+// ====== BEST3ランキング機能 ======
+
+// 監督の傑作BEST5を取得
+export const getDirectorBest5 = async (directorId: number): Promise<Movie[]> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/person/${directorId}/movie_credits?language=ja-JP`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        // 監督作品のみをフィルタリング
+        const directedMovies = (data.crew || []).filter((m: any) => m.job === 'Director');
+
+        // 人気度と評価の高い順にソートしてTOP5を返す
+        return directedMovies
+            .filter((m: Movie) => m.poster_path)
+            .sort((a: Movie, b: Movie) => {
+                // まず評価でソート、同じなら人気度でソート
+                const ratingDiff = (b.vote_average || 0) - (a.vote_average || 0);
+                if (ratingDiff !== 0) return ratingDiff;
+                return (b.popularity || 0) - (a.popularity || 0);
+            })
+            .slice(0, 5);
+    } catch (error) {
+        console.error('Director best5 fetch error:', error);
+        return [];
+    }
+};
+
+// 年代別×国別名作BEST5を取得
+export const getEraCountryBest5 = async (
+    countryCode: string,
+    decadeStart: string
+): Promise<Movie[]> => {
+    try {
+        const startYear = parseInt(decadeStart);
+        const endYear = startYear + 9;
+
+        const response = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&with_origin_country=${countryCode}&primary_release_date.gte=${startYear}-01-01&primary_release_date.lte=${endYear}-12-31&sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        return (data.results || [])
+            .filter((m: Movie) => m.poster_path)
+            .slice(0, 5);
+    } catch (error) {
+        console.error('Era country best5 fetch error:', error);
+        return [];
+    }
+};
+
+// 隠れた名作BEST5を取得（評価が高いが投票数が少ないもの）
+export const getHiddenGemBest5 = async (genreId: number): Promise<Movie[]> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&with_genres=${genreId}&sort_by=vote_average.desc&vote_count.gte=50&vote_count.lte=500&vote_average.gte=7.5`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        // ランダム性を追加するために日付ベースでオフセット
+        const today = new Date();
+        const dayOfYear = Math.floor(
+            (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        const offset = (dayOfYear * 5) % Math.max(1, (data.results?.length || 1) - 5);
+
+        return (data.results || [])
+            .filter((m: Movie) => m.poster_path)
+            .slice(offset, offset + 5);
+    } catch (error) {
+        console.error('Hidden gem best5 fetch error:', error);
+        return [];
+    }
+};
+
+// 世界の映画BEST5を取得（普段触れない国の映画）
+export const getWorldCinemaBest5 = async (countryCode: string): Promise<Movie[]> => {
+    try {
+        const response = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&with_origin_country=${countryCode}&sort_by=vote_average.desc&vote_count.gte=50&vote_average.gte=6.5`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        // ランダム性を追加
+        const today = new Date();
+        const dayOfYear = Math.floor(
+            (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        const offset = (dayOfYear * 2) % Math.max(1, (data.results?.length || 1) - 5);
+
+        return (data.results || [])
+            .filter((m: Movie) => m.poster_path)
+            .slice(offset, offset + 5);
+    } catch (error) {
+        console.error('World cinema best5 fetch error:', error);
+        return [];
+    }
+};
+
+// 日本映画BEST5を取得
+export const getJapaneseMovieBest5 = async (genreId: number | null): Promise<Movie[]> => {
+    try {
+        const genreParam = genreId ? `&with_genres=${genreId}` : '';
+        const response = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&with_origin_country=JP${genreParam}&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=7.0`,
+            fetchOptions
+        );
+        const data = await response.json();
+
+        // ランダム性を追加
+        const today = new Date();
+        const dayOfYear = Math.floor(
+            (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        const offset = (dayOfYear * 2) % Math.max(1, (data.results?.length || 1) - 5);
+
+        return (data.results || [])
+            .filter((m: Movie) => m.poster_path)
+            .slice(offset, offset + 5);
+    } catch (error) {
+        console.error('Japanese movie best5 fetch error:', error);
+        return [];
+    }
+};
