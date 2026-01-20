@@ -11,7 +11,11 @@ import {
     Image,
     TextInput,
     ActivityIndicator,
+    Linking,
+    Platform,
+    Alert,
 } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/Colors';
 import { voiceRecognition } from '../services/voiceRecognition';
@@ -40,6 +44,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     movie,
 }) => {
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     const [transcript, setTranscript] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -716,10 +721,37 @@ ${conversationText}
                         </TouchableOpacity>
                         <Text style={styles.modalHeaderTitle}>REVIEW</Text>
                         {/* プロフィールアイコン（右）- 他ページと統一 */}
-                        <View style={styles.profileIcon}>
-                            <View style={styles.profileHead} />
-                            <View style={styles.profileBody} />
-                        </View>
+                        <TouchableOpacity
+                            style={styles.profileIcon}
+                            onPress={() => {
+                                onClose();
+                                if (!user) {
+                                    router.push('/(auth)/login');
+                                } else {
+                                    router.push('/profile');
+                                }
+                            }}
+                        >
+                            {user?.user_metadata?.avatar_url ? (
+                                <Image
+                                    source={{ uri: user.user_metadata.avatar_url }}
+                                    style={{ width: 28, height: 28, borderRadius: 14 }}
+                                />
+                            ) : user?.email ? (
+                                <Text style={{
+                                    fontSize: 12,
+                                    color: Colors.light.headerBg,
+                                    fontWeight: '600',
+                                }}>
+                                    {user.email.charAt(0).toUpperCase()}
+                                </Text>
+                            ) : (
+                                <View style={{ alignItems: 'center' }}>
+                                    <View style={styles.profileHead} />
+                                    <View style={styles.profileBody} />
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
 

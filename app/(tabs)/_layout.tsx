@@ -44,6 +44,13 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="timeline"
+                options={{
+                    title: 'TIMELINE',
+                    tabBarIcon: ({ focused }) => <TabIcon label="TIMELINE" focused={focused} />,
+                }}
+            />
+            <Tabs.Screen
                 name="calendar"
                 options={{
                     title: 'LOG',

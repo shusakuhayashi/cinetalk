@@ -8,36 +8,41 @@ import {
     StyleSheet,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Alert, // 追加
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router'; // 修正: hookを使用
 import { Colors } from '../constants/Colors';
-import { useAuthStore } from '../stores/authStore';
+import { useAuth } from '../contexts/AuthContext'; // 修正
+import { supabase } from '../services/supabase'; // 追加
 
 const HEADER_HEIGHT = 50;
 
 // ポップコーンロゴ（画像版）- タップで前の画面に戻る
-const PopcornLogo = () => (
-    <TouchableOpacity
-        onPress={() => {
-            if (router.canGoBack()) {
-                router.back();
-            } else {
-                router.replace('/');
-            }
-        }}
-        style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16, marginRight: 12 }}
-    >
-        <Image
-            source={require('../assets/logo-cloud-camera.png')}
-            style={{
-                width: 28,
-                height: 28,
+const PopcornLogo = () => {
+    const router = useRouter();
+    return (
+        <TouchableOpacity
+            onPress={() => {
+                if (router.canGoBack()) {
+                    router.back();
+                } else {
+                    router.replace('/');
+                }
             }}
-            resizeMode="contain"
-        />
-    </TouchableOpacity>
-);
+            style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16, marginRight: 12 }}
+        >
+            <Image
+                source={require('../assets/logo-cloud-camera.png')}
+                style={{
+                    width: 28,
+                    height: 28,
+                }}
+                resizeMode="contain"
+            />
+        </TouchableOpacity>
+    );
+};
 
 // ヘッダー左側のロゴ + タイトル
 const HeaderLeft = () => (
@@ -48,36 +53,47 @@ const HeaderLeft = () => (
 
 // ヘッダー右側のプロフィールアイコン
 const ProfileIcon = () => {
-    const { user, isAuthenticated } = useAuthStore();
+    const { user, loading } = useAuth();
+    const router = useRouter();
+
+    const handlePress = () => {
+        if (!user) {
+            router.push('/(auth)/login');
+        } else {
+            router.push('/profile');
+        }
+    };
+
+    if (loading) return null;
 
     return (
         <TouchableOpacity
-            onPress={() => router.push('/profile')}
+            onPress={handlePress}
             style={{
                 marginRight: 16,
                 width: 28,
                 height: 28,
                 borderRadius: 14,
-                backgroundColor: isAuthenticated ? Colors.light.headerText : 'transparent',
-                borderWidth: isAuthenticated ? 0 : 1.5,
+                backgroundColor: user ? Colors.light.headerText : 'transparent',
+                borderWidth: user ? 0 : 1.5,
                 borderColor: Colors.light.headerText,
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
             }}
         >
-            {isAuthenticated && user?.avatar_url ? (
+            {user?.user_metadata?.avatar_url ? (
                 <Image
-                    source={{ uri: user.avatar_url }}
+                    source={{ uri: user.user_metadata.avatar_url }}
                     style={{ width: 28, height: 28, borderRadius: 14 }}
                 />
-            ) : isAuthenticated && user?.display_name ? (
+            ) : user?.email ? (
                 <Text style={{
                     fontSize: 12,
                     color: Colors.light.headerBg,
                     fontWeight: '600',
                 }}>
-                    {user.display_name.charAt(0).toUpperCase()}
+                    {user.email.charAt(0).toUpperCase()}
                 </Text>
             ) : (
                 // 未ログイン: 人マーク

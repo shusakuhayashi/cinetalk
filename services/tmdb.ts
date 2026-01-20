@@ -19,6 +19,20 @@ export interface TMDbReview {
     iso_639_1: string; // 言語コード (en, ja, etc.)
 }
 
+// TMDb動画型
+export interface TMDbVideo {
+    id: string;
+    iso_639_1: string;
+    iso_3166_1: string;
+    key: string;
+    name: string;
+    site: string;       // "YouTube" など
+    size: number;
+    type: string;       // "Trailer", "Teaser" など
+    official: boolean;
+    published_at: string;
+}
+
 // 画像URLを生成
 export const getImageUrl = (path: string | null, size: 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') => {
     if (!path) return null;
@@ -95,6 +109,27 @@ export const getMovieReviews = async (movieId: number, page = 1): Promise<{ resu
         fetchOptions
     );
     return response.json();
+};
+
+// 映画の動画（予告編など）を取得
+export const getMovieVideos = async (movieId: number): Promise<{ results: TMDbVideo[] }> => {
+    // まず日本語の動画を取得
+    const jaResponse = await fetch(
+        `${baseUrl}/movie/${movieId}/videos?language=ja-JP`,
+        fetchOptions
+    );
+    const jaData = await jaResponse.json();
+
+    // 日本語の予告編があればそれを優先
+    if (jaData.results && jaData.results.length > 0) {
+        return jaData;
+    }
+
+    // なければ英語（オリジナル）を取得
+    return fetch(
+        `${baseUrl}/movie/${movieId}/videos?language=en-US`,
+        fetchOptions
+    ).then(res => res.json());
 };
 
 // 日本語レビューを優先してソート
@@ -551,7 +586,7 @@ export const getDirectorBest5 = async (directorId: number): Promise<Movie[]> => 
         // 方法3: 最終手段（特定の監督でAPIがうまく機能しない場合のハードコード対応）
         // 今敏 (Satoshi Kon)
         if (directorId === 16265) {
-            const konMoviesIds = [4977, 12431, 13398, 10494, 42994]; // パプリカ, 千年女優, 東京ゴッドファーザーズ, パーフェクトブルー, MEMORIES(脚本)
+            const konMoviesIds = [4977, 10078, 13398, 10494, 42994]; // パプリカ, 千年女優, 東京ゴッドファーザーズ, パーフェクトブルー, MEMORIES(脚本)
             const promises = konMoviesIds.map(id =>
                 fetch(`${baseUrl}/movie/${id}?language=ja-JP`, fetchOptions).then(r => r.json())
             );

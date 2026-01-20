@@ -8,14 +8,15 @@ import {
     ActivityIndicator,
     Dimensions,
     Linking,
-    Alert,
+    Platform,
     Modal,
+    Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createElement } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
-import { getMovieDetails, getRecommendations, getImageUrl, getWatchProviders, getProviderUrl, WatchProvider, WatchProviderResult } from '../../services/tmdb';
+import { getMovieDetails, getRecommendations, getImageUrl, getWatchProviders, getProviderUrl, getMovieVideos, WatchProvider, WatchProviderResult, TMDbVideo } from '../../services/tmdb';
 import { MovieDetails, Movie } from '../../types';
 import { MovieCard } from '../../components/MovieCard';
 import { ReviewModal } from '../../components/ReviewModal';
@@ -40,6 +41,7 @@ export default function MovieDetailScreen() {
     const [showVoiceModal, setShowVoiceModal] = useState(false);
     const [showPosterModal, setShowPosterModal] = useState(false);
     const [watchProviders, setWatchProviders] = useState<WatchProviderResult | null>(null);
+    const [trailerKey, setTrailerKey] = useState<string | null>(null);
 
     const { isFavorite, isInWatchlist, addFavorite, removeFavorite, addToWatchlist, removeFromWatchlist } = useMovieListStore();
     const { getReviewByMovieId } = useReviewStore();
@@ -57,14 +59,23 @@ export default function MovieDetailScreen() {
 
     const fetchMovieData = async (movieId: number) => {
         try {
-            const [details, recs, providers] = await Promise.all([
+            const [details, recs, providers, videoData] = await Promise.all([
                 getMovieDetails(movieId),
                 getRecommendations(movieId),
                 getWatchProviders(movieId),
+                getMovieVideos(movieId),
             ]);
             setMovie(details);
             setRecommendations(recs.results || []);
             setWatchProviders(providers);
+
+            // 予告編を探す (Official Trailer優先、なければTrailer、なければTeaser)
+            const videos = (videoData as { results: TMDbVideo[] }).results || [];
+            const trailer = videos.find(v => v.site === 'YouTube' && v.type === 'Trailer')
+                || videos.find(v => v.site === 'YouTube');
+            if (trailer) {
+                setTrailerKey(trailer.key);
+            }
         } catch (error) {
             console.error('Failed to fetch movie:', error);
         } finally {
@@ -354,6 +365,43 @@ export default function MovieDetailScreen() {
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
+                    </View>
+                )}
+
+                {/* 予告編セクション */}
+                {trailerKey && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>TRAILER</Text>
+                        {Platform.OS === 'web' ? (
+                            <View style={styles.trailerContainer}>
+                                {createElement('iframe', {
+                                    width: "100%",
+                                    height: "100%",
+                                    src: `https://www.youtube.com/embed/${trailerKey}`,
+                                    frameBorder: "0",
+                                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+                                    allowFullScreen: true,
+                                    style: { aspectRatio: '16 / 9', borderRadius: 8, border: 'none' }
+                                })}
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.trailerButton}
+                                onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${trailerKey}`)}
+                                activeOpacity={0.8}
+                            >
+                                <Image
+                                    source={{ uri: `https://img.youtube.com/vi/${trailerKey}/mqdefault.jpg` }}
+                                    style={styles.trailerThumbnail}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.playIconOverlay}>
+                                    <View style={styles.playIconBack}>
+                                        <Text style={styles.playIcon}>▶</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
@@ -1097,5 +1145,52 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: '#FFFFFF',
         fontWeight: '300',
+    },
+    // 予告編スタイル
+    trailerContainer: {
+        width: '100%',
+        aspectRatio: 16 / 9,
+        backgroundColor: '#000',
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    trailerButton: {
+        width: '100%',
+        aspectRatio: 16 / 9,
+        backgroundColor: '#000',
+        borderRadius: 8,
+        overflow: 'hidden',
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    trailerThumbnail: {
+        width: '100%',
+        height: '100%',
+        opacity: 0.8,
+    },
+    playIconOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    playIconBack: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    playIcon: {
+        color: '#fff',
+        fontSize: 24,
+        marginLeft: 4, // 視覚的な中央調整
     },
 });

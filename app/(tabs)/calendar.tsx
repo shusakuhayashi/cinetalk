@@ -41,13 +41,21 @@ export default function CalendarScreen() {
 
     // 選択された日付の記録を取得
     const selectedRecords = useMemo(() => {
-        return records.filter((r) => r.watched_at.split('T')[0] === selectedDate);
+        return records.filter((r) => {
+            const date = new Date(r.watched_at);
+            const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            return dateStr === selectedDate;
+        });
     }, [records, selectedDate]);
 
     // 日付に記録があるかチェック
     const hasRecord = (day: number) => {
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        return records.some((r) => r.watched_at.split('T')[0] === dateStr);
+        const targetDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        return records.some((r) => {
+            const date = new Date(r.watched_at);
+            const recordDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            return recordDateStr === targetDateStr;
+        });
     };
 
     const goToPrevMonth = () => {
@@ -247,7 +255,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.light.surface,
     },
     dayCell: {
-        width: (width - 20) / 7,
+        width: '14.28%',
         height: 50,
         alignItems: 'center',
         justifyContent: 'center',
