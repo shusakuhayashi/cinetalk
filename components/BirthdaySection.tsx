@@ -71,7 +71,10 @@ export const BirthdaySection: React.FC<BirthdaySectionProps> = ({
                     >
                         <View style={styles.personInfo}>
                             <View style={styles.nameRow}>
-                                <Text style={styles.personName}>{person.nameJa}</Text>
+                                <Text style={styles.personName}>
+                                    {person.nameJa}
+                                    {person.country && <Text style={styles.countryText}>（{person.country}）</Text>}
+                                </Text>
                                 <Text style={styles.birthdayText}>{formatBirthday(person)}</Text>
                             </View>
                             <Text style={styles.personEnglishName}>{person.name}</Text>
@@ -228,5 +231,10 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: Colors.light.text,
         textAlign: 'center',
+    },
+    countryText: {
+        fontSize: 14,
+        fontWeight: '400',
+        color: Colors.light.textMuted,
     },
 });

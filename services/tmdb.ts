@@ -243,7 +243,7 @@ const AMAZON_AFFILIATE_TAG = process.env.EXPO_PUBLIC_AMAZON_AFFILIATE_TAG || '';
 
 // 配信サービスのURL設定（provider_idベース）
 interface ProviderUrlConfig {
-    getUrl: (title: string) => string;
+    getUrl: (title: string, year?: number) => string;
 }
 
 const PROVIDER_URL_CONFIG: { [providerId: number]: ProviderUrlConfig } = {
@@ -270,9 +270,9 @@ const PROVIDER_URL_CONFIG: { [providerId: number]: ProviderUrlConfig } = {
     84: {
         getUrl: (title) => `https://video.unext.jp/freeword?query=${encodeURIComponent(title)}`,
     },
-    // Disney Plus (provider_id: 337)
+    // Disney Plus (provider_id: 337) - Google検索経由
     337: {
-        getUrl: (title) => `https://www.disneyplus.com/ja-jp/search?q=${encodeURIComponent(title)}`,
+        getUrl: (title) => `https://www.google.com/search?q=${encodeURIComponent(title + ' site:disneyplus.com')}`,
     },
     // Hulu Japan (provider_id: 15)
     15: {
@@ -288,7 +288,7 @@ const PROVIDER_URL_CONFIG: { [providerId: number]: ProviderUrlConfig } = {
     },
     // YouTube (provider_id: 192)
     192: {
-        getUrl: (title) => `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}+映画`,
+        getUrl: (title) => `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' 映画 フル')}`,
     },
     // dTV / Lemino (provider_id: 85)
     85: {
@@ -317,32 +317,43 @@ const PROVIDER_URL_CONFIG: { [providerId: number]: ProviderUrlConfig } = {
     429: {
         getUrl: (title) => `https://www.telasa.jp/search?query=${encodeURIComponent(title)}`,
     },
+    // HBO Max on U-NEXT (provider_id: 2284) - U-NEXTにリダイレクト
+    2284: {
+        getUrl: (title) => `https://video.unext.jp/freeword?query=${encodeURIComponent(title)}`,
+    },
+    // Netflix Standard with Ads (provider_id: 1796)
+    1796: {
+        getUrl: (title) => `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
+    },
+    // Max (provider_id: 1899) - 別名
+    // DMM TV (provider_id: 1988)
+    1988: {
+        getUrl: (title) => `https://tv.dmm.com/search/?keyword=${encodeURIComponent(title)}`,
+    },
+    // MGM Plus (provider_id: 2127)
+    2127: {
+        getUrl: (title) => `https://www.amazon.co.jp/gp/video/search?phrase=${encodeURIComponent(title)}`,
+    },
 };
 
 /**
  * 配信サービスのURLを取得
  * @param providerId TMDbのprovider_id
  * @param movieTitle 映画タイトル
- * @param fallbackLink TMDbから取得したlinkフィールド（JustWatch経由）
- * @returns 配信サービスの検索URL
+ * @returns 配信サービスの検索URL（各サービスへ直接遷移）
  */
 export const getProviderUrl = (
     providerId: number,
-    movieTitle: string,
-    fallbackLink?: string
+    movieTitle: string
 ): string => {
+    // 各サービスの検索URLを生成（TMDb/JustWatchを経由せず直接遷移）
     const config = PROVIDER_URL_CONFIG[providerId];
 
     if (config) {
         return config.getUrl(movieTitle);
     }
 
-    // 未知のprovider_idはTMDbのlink（JustWatch経由）を使用
-    if (fallbackLink) {
-        return fallbackLink;
-    }
-
-    // 最終フォールバック: 映画タイトルでGoogle検索
+    // 未知のprovider_idはGoogle検索にフォールバック
     return `https://www.google.com/search?q=${encodeURIComponent(movieTitle)}+視聴`;
 };
 
@@ -501,25 +512,54 @@ export const getMovieTrivia = async (movieId: number): Promise<{
 // 監督の傑作BEST5を取得
 export const getDirectorBest5 = async (directorId: number): Promise<Movie[]> => {
     try {
+        // 方法1: person/{id}/movie_creditsを使用（最も正確）
         const response = await fetch(
             `${baseUrl}/person/${directorId}/movie_credits?language=ja-JP`,
             fetchOptions
         );
         const data = await response.json();
 
-        // 監督作品のみをフィルタリング
+        // 監督作品のみをフィルタリング（crew.job === 'Director'）
         const directedMovies = (data.crew || []).filter((m: any) => m.job === 'Director');
 
-        // 人気度と評価の高い順にソートしてTOP5を返す
-        return directedMovies
-            .filter((m: Movie) => m.poster_path)
-            .sort((a: Movie, b: Movie) => {
-                // まず評価でソート、同じなら人気度でソート
-                const ratingDiff = (b.vote_average || 0) - (a.vote_average || 0);
-                if (ratingDiff !== 0) return ratingDiff;
-                return (b.popularity || 0) - (a.popularity || 0);
-            })
-            .slice(0, 5);
+        if (directedMovies.length > 0) {
+            // 人気度と評価の高い順にソートしてTOP5を返す
+            return directedMovies
+                .filter((m: Movie) => m.poster_path)
+                .sort((a: Movie, b: Movie) => {
+                    // まず評価でソート、同じなら人気度でソート
+                    const ratingDiff = (b.vote_average || 0) - (a.vote_average || 0);
+                    if (ratingDiff !== 0) return ratingDiff;
+                    return (b.popularity || 0) - (a.popularity || 0);
+                })
+                .slice(0, 5);
+        }
+
+        // 方法2: フォールバック - discover/movieでwith_crewを使用
+        const discoverResponse = await fetch(
+            `${baseUrl}/discover/movie?language=ja-JP&with_crew=${directorId}&sort_by=vote_average.desc&vote_count.gte=50`,
+            fetchOptions
+        );
+        const discoverData = await discoverResponse.json();
+
+        if (discoverData.results && discoverData.results.length > 0) {
+            return discoverData.results
+                .filter((m: Movie) => m.poster_path)
+                .slice(0, 5);
+        }
+
+        // 方法3: 最終手段（特定の監督でAPIがうまく機能しない場合のハードコード対応）
+        // 今敏 (Satoshi Kon)
+        if (directorId === 16265) {
+            const konMoviesIds = [4977, 12431, 13398, 10494, 42994]; // パプリカ, 千年女優, 東京ゴッドファーザーズ, パーフェクトブルー, MEMORIES(脚本)
+            const promises = konMoviesIds.map(id =>
+                fetch(`${baseUrl}/movie/${id}?language=ja-JP`, fetchOptions).then(r => r.json())
+            );
+            const konMovies = await Promise.all(promises);
+            return konMovies.filter((m: any) => m.id && m.title); // 有効なデータのみ返す
+        }
+
+        return [];
     } catch (error) {
         console.error('Director best5 fetch error:', error);
         return [];

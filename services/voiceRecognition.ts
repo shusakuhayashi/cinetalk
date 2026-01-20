@@ -56,12 +56,21 @@ class VoiceRecognitionService {
 
                 this.recognition.onerror = (event: any) => {
                     console.error('Speech recognition error:', event.error);
+
+                    // no-speechはタイムアウトなので、エラー表示せずに継続
+                    if (event.error === 'no-speech') {
+                        // 認識を再開
+                        try {
+                            this.recognition.start();
+                        } catch (e) {
+                            // すでに開始している場合は無視
+                        }
+                        return;
+                    }
+
                     if (this.onError) {
                         let errorMessage = '音声認識エラー';
                         switch (event.error) {
-                            case 'no-speech':
-                                errorMessage = '音声が検出されませんでした';
-                                break;
                             case 'audio-capture':
                                 errorMessage = 'マイクにアクセスできません';
                                 break;

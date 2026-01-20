@@ -16,9 +16,18 @@ import { useAuthStore } from '../stores/authStore';
 
 const HEADER_HEIGHT = 50;
 
-// ポップコーンロゴ（画像版）
+// ポップコーンロゴ（画像版）- タップで前の画面に戻る
 const PopcornLogo = () => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16, marginRight: 12 }}>
+    <TouchableOpacity
+        onPress={() => {
+            if (router.canGoBack()) {
+                router.back();
+            } else {
+                router.replace('/');
+            }
+        }}
+        style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16, marginRight: 12 }}
+    >
         <Image
             source={require('../assets/logo-cloud-camera.png')}
             style={{
@@ -27,7 +36,7 @@ const PopcornLogo = () => (
             }}
             resizeMode="contain"
         />
-    </View>
+    </TouchableOpacity>
 );
 
 // ヘッダー左側のロゴ + タイトル
@@ -197,7 +206,13 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
                 {showBackButton ? (
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace('/');
+                            }
+                        }}
                     >
                         <Text style={styles.backButtonText}>‹</Text>
                     </TouchableOpacity>
@@ -235,18 +250,10 @@ export const StaticHeader: React.FC<StaticHeaderProps> = ({
             ]}
         >
             <View style={styles.headerContent}>
-                {showBackButton ? (
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
-                        <Text style={styles.backButtonText}>‹</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <HeaderLeft />
-                )}
+                {/* 常にロゴを表示 */}
+                <HeaderLeft />
                 <Text style={styles.headerTitle}>{title}</Text>
-                <View style={styles.headerSpacer} />
+                {showBackButton && <View style={styles.headerSpacer} />}
                 <ProfileIcon />
             </View>
         </View>
@@ -332,7 +339,13 @@ export const ScrollAwareHeader: React.FC<ScrollAwareHeaderProps> = ({
                 {showBackButton ? (
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back();
+                            } else {
+                                router.replace('/');
+                            }
+                        }}
                     >
                         <Text style={styles.backButtonText}>‹</Text>
                     </TouchableOpacity>
@@ -362,13 +375,15 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     headerTitle: {
+        flex: 1,
         fontWeight: '600',
         fontSize: 14,
         letterSpacing: 2,
         color: Colors.light.headerText,
+        textAlign: 'center',
     },
     headerSpacer: {
-        flex: 1,
+        flex: 0,
     },
     backButton: {
         marginLeft: 8,

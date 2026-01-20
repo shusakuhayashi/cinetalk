@@ -220,3 +220,72 @@ export const getProviderUrl = (providerId: number, providerName: string, movieTi
 export const getProviderInfo = (providerId: number): ProviderConfig | null => {
     return providerConfigs[providerId] || null;
 };
+
+/**
+ * 主要な日本の配信サービス（「他のサービスで探す」セクション用）
+ * TMDbのデータに関係なく常に表示されます
+ */
+export interface AdditionalProvider {
+    id: number;
+    name: string;
+    logoUrl: string; // ローカルまたはCDNからのロゴ画像
+    color: string; // ブランドカラー
+}
+
+export const additionalProviders: AdditionalProvider[] = [
+    {
+        id: 84,
+        name: 'U-NEXT',
+        logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/U-NEXT_logo.svg/200px-U-NEXT_logo.svg.png',
+        color: '#00BFFF',
+    },
+    {
+        id: 8,
+        name: 'Netflix',
+        logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/200px-Netflix_2015_logo.svg.png',
+        color: '#E50914',
+    },
+    {
+        id: 15,
+        name: 'Hulu',
+        logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Hulu_Logo.svg/200px-Hulu_Logo.svg.png',
+        color: '#1CE783',
+    },
+    {
+        id: 9,
+        name: 'Prime Video',
+        logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Amazon_Prime_Video_logo.svg/200px-Amazon_Prime_Video_logo.svg.png',
+        color: '#00A8E1',
+    },
+    {
+        id: 240,
+        name: 'ABEMA',
+        logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/ABEMA_logo.svg/200px-ABEMA_logo.svg.png',
+        color: '#00C73C',
+    },
+    {
+        id: 85,
+        name: 'Lemino',
+        logoUrl: 'https://lemino.docomo.ne.jp/favicon.ico',
+        color: '#FF6B6B',
+    },
+    {
+        id: 97,
+        name: '楽天TV',
+        logoUrl: 'https://tv.rakuten.co.jp/favicon.ico',
+        color: '#BF0000',
+    },
+    {
+        id: 86,
+        name: 'TELASA',
+        logoUrl: 'https://www.telasa.jp/favicon.ico',
+        color: '#FF5722',
+    },
+];
+
+/**
+ * 追加プロバイダーのURLを取得（アフィリエイト対応）
+ */
+export const getAdditionalProviderUrl = (providerId: number, movieTitle: string): string => {
+    return getProviderUrl(providerId, '', movieTitle);
+};

@@ -28,7 +28,7 @@ export const FAMOUS_DIRECTORS: DirectorData[] = [
     { id: 5281, name: "Wes Anderson", nameJa: "ウェス・アンダーソン" },
     { id: 5126, name: "Guillermo del Toro", nameJa: "ギレルモ・デル・トロ" },
     { id: 57130, name: "Jordan Peele", nameJa: "ジョーダン・ピール" },
-    { id: 11614, name: "Satoshi Kon", nameJa: "今敏" },
+    { id: 16265, name: "Satoshi Kon", nameJa: "今敏" },
 ];
 
 // 国×年代の組み合わせ（年代別名作BEST3用）
